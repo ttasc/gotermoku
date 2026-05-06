@@ -32,9 +32,8 @@ const (
 	ColorBgModal  = 235 // Background color for the popup modal.
 )
 
-// Render clears the terminal, draws the current game state, and presents it to the screen.
+// Render draws the current game state, and presents it to the screen.
 func Render(state *GameState) {
-	ttbox.Clear()
 
 	drawStatusline(state)
 	drawBoard(state)
