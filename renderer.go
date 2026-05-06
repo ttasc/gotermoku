@@ -128,10 +128,10 @@ func drawStatusline(state *GameState) {
 	y := max(offsetY-2, 0) // Ensure it does not overflow if the terminal is too small.
 
 	// Calculate elapsed time.
-	elapsed := int(time.Since(state.StartTime).Seconds())
-	hours := elapsed / 3600
-	mins := elapsed / 60
-	secs := elapsed % 60
+	elapsed := time.Since(state.StartTime)
+	hours := int(elapsed.Hours())
+	mins := int(elapsed.Minutes()) % 60
+	secs := int(elapsed.Seconds()) % 60
 	timerText := fmt.Sprintf("  %02d:%02d:%02d  ", hours, mins, secs)
 
 	// Center the entire status line horizontally.
