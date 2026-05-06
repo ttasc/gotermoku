@@ -37,13 +37,15 @@ The system is strictly divided into distinct operational layers:
 
 ## Installation
 
-Ensure you have a working Go toolchain installed, then clone and build the binary:
+You can download the pre-built binary file [here](https://github.com/ttasc/gotermoku/releases/latest) or build from source:
 
 ```sh
 git clone https://github.com/ttasc/gotermoku.git
 cd gotermoku
 go build -o gotermoku
 ```
+
+> Ensure you have a working Go toolchain installed
 
 ## Usage
 
