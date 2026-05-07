@@ -6,34 +6,37 @@ A minimal, terminal-based Gomoku game written in Go.
 
 ![](./demo.gif)
 
-A lightweight implementation of Gomoku (Five in a Row) built specifically for the terminal. It provides a distraction-free interface for both local and online peer-to-peer matches, utilizing a straightforward event-driven loop and a clean xterm-256 rendering pipeline.
+A lightweight implementation of Gomoku (Five in a Row) built specifically for the terminal. It provides a distraction-free interface for local offline play, playing against an AI, and online peer-to-peer matches. It utilizes a straightforward event-driven loop and a clean xterm-256 rendering pipeline.
 
 ## Philosophy
 
 - **Minimalism:** No heavy graphical engines or bloated web wrappers. Uses a single, lightweight TUI dependency [ttasc/ttbox](https://github.com/ttasc/ttbox).
 - **Explicit over implicit:** The game runs on a single source of truth (`GameState`). State mutations are localized and predictable.
-- **Server as truth:** In multiplayer, the host dictates the state. The client acts as a dumb terminal to prevent desynchronization.
+- **Server as truth:** In multiplayer, the host dictates the state and board size. The client acts as a dumb terminal to prevent desynchronization.
 - **Keyboard-centric:** Built for keyboard users with native Vim bindings. Mouse support exists but remains entirely optional.
 
 ## Features
 
 - Local offline play (hotseat mode).
-- Peer-to-peer TCP multiplayer (Host/Client configuration).
-- Standard Arrow and Vim-style (HJKL) movement keys.
+- Single-player mode against a *built-in* `Heuristic AI Bot`.
+- Customizable board sizes (dynamic scaling) with terminal capacity validation.
+- *Peer-to-peer* TCP multiplayer (Host/Client configuration).
+- Standard Arrow and Vim-style (*HJKL*) movement keys.
 - Two-click mouse interactions (focus, then place).
 - Stateless UI rendering with a minimalist pastel color scheme.
-- Smart endgame UI positioning (popups yield to winning pieces).
 
 ## Architecture
 
 The system is strictly divided into distinct operational layers:
 
-- **State (`state.go`):** The isolated data model. Contains board layout, turn data, and metrics.
-- **Orchestrator (`main.go`):** The main game loop. Polls for TUI and network events iteratively without blocking.
+- **Entry & Config (`main.go`, `config.go`):** Parses CLI flags, validates dimensions, and wires dependencies.
+- **Orchestrator (`engine.go`):** The main game loop. Polls for TUI and network events iteratively without blocking.
+- **State (`state.go`):** The isolated dynamic data model. Contains board layout slices, turn data, and metrics.
 - **Input (`input.go`):** Translates physical keystrokes and mouse coordinates into logical state mutations.
+- **AI Engine (`bot.go`):** Asynchronous heuristic evaluation engine for offline single-player mode.
 - **Networking (`network.go`):** Asynchronous TCP socket layer handling JSON message streams via dedicated goroutines.
 - **Renderer (`renderer.go`):** Purely functional view layer. Reads the state struct and translates it to terminal sequences.
-- **Rules Engine (`win.go`):** Localized 4-axis validation to verify win conditions efficiently.
+- **Rules Engine (`win.go`):** Localized validation to verify win conditions efficiently without scanning the whole board.
 
 ## Installation
 
@@ -51,17 +54,28 @@ go build -o gotermoku
 
 ### Run locally (Offline Mode)
 ```sh
+# Default size (20x30)
 ./gotermoku
+
+# Custom board size
+./gotermoku --size 15x15
+./gotermoku -s 10x10
+```
+
+### Play against AI Bot
+```sh
+./gotermoku --bot
+./gotermoku --bot -s 15x20
 ```
 
 ### Host an online game
-Listen on a specified port and wait for an opponent.
+Listen on a specified port and wait for an opponent. *(Note: The Host dictates the board size for both players).*
 ```sh
-./gotermoku --host --port 3333
+./gotermoku --host --port 3333 -s 20x30
 ```
 
 ### Join an online game
-Connect to a waiting host.
+Connect to a waiting host. *(The board size will automatically sync with the Host).*
 ```sh
 ./gotermoku --join 192.168.1.50 --port 3333
 ```
@@ -81,7 +95,7 @@ The project requires no special build tools beyond standard Go.
 go build -o gotermoku .
 ```
 
-To modify rendering output, adjust the constant palette blocks located at the top of `renderer.go`. Networking protocols can be expanded by extending the `NetMessage` struct in `network.go`.
+To modify rendering output, adjust the constant palette blocks located at the top of `renderer.go`. Networking protocols can be expanded by extending the `NetMessage` struct in `network.go`. To adjust the AI difficulty, tweak the weight multipliers inside `bot.go`.
 
 ## License
 

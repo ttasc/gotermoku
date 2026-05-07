@@ -241,11 +241,10 @@ func drawEndgamePopup(state *GameState) {
 	x := (w - boxW) / 2
 
 	// --- SMART POSITIONING ---
-	// Calculate the average Y position of the winning pieces to avoid covering them with the popup.
 	avgWinY := 0
 	if len(state.WinningPositions) > 0 {
 		for _, pos := range state.WinningPositions {
-			avgWinY += pos[1] // Accumulate the Y coordinates of the winning pieces.
+			avgWinY += pos[1] // Accumulate the Y coordinates of the winning pieces (0 to Rows-1).
 		}
 		avgWinY /= len(state.WinningPositions)
 	}
@@ -254,17 +253,18 @@ func drawEndgamePopup(state *GameState) {
 	offsetY := (h - boardHeight) / 2
 	var y int
 
-	// If the winning pieces are in the top half of the board, push the popup to the bottom.
 	if avgWinY < state.Rows/2 {
+		// Victory occurs in the top half -> Place the popup close to the bottom edge of the chessboard
 		y = offsetY + boardHeight
-		// If the terminal is too short, force the popup to sit at the bottom edge.
-		if y+boxH > h {
-			y = h - boxH
+
+		// Constraint: Do not let the popup overwrite the Controls Guide line in h-1.
+		if y+boxH > h-1 {
+			y = h - 1 - boxH
 		}
 	} else {
-		// If the winning pieces are in the bottom half of the board, push the popup to the top.
-		// If the terminal is too short, force the popup to sit at the top edge.
-		y = max(offsetY-boxH-1, 0)
+		// Victory occurs in the bottom half -> Move the popup to the "middle-up" part of the chessboard
+		// DO NOT push y < offsetY to protect the status bar/Timer above.
+		y = max(offsetY+(state.Rows/2-boxH/2)-1, offsetY) // Safety constraint: If the chessboard is too small, make it sit right at the top of the board.
 	}
 
 	// Clear the modal background area.
