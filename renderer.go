@@ -211,7 +211,7 @@ func drawControlsGuide() {
 	}
 
 	guideText := " Move(h, j, k, l; arrows)   Place(space, enter; left-click twice)   Quit(Ctrl+C, Esc) "
-	ttbox.DrawTextCenter(h-1, guideText, ColorTextDim, ttbox.ColorDefault)
+	ttbox.DrawTextCenter(h-1, guideText, ColorText, ttbox.ColorDefault)
 }
 
 // drawEndgamePopup displays a modal dialogue when the game concludes, showing the winner and restart instructions.
