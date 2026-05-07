@@ -131,7 +131,7 @@ func main() {
 			switch evt.Type {
 			case ttbox.EventKey:
 				// Handle application exit.
-				if evt.Key == ttbox.KeyEscape || evt.Key == ttbox.KeyCtrlC {
+				if evt.Key == ttbox.KeyEscape || evt.Key == ttbox.KeyCtrlC || evt.Ch == 'q' || evt.Ch == 'Q' {
 					isRunning = false
 				}
 				// Handle game restart.
