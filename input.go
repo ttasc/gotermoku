@@ -55,8 +55,8 @@ func handleKeyboard(evt ttbox.Event, state *GameState, netMgr *NetworkManager, p
 	// If the cursor is hidden (-1) because the mouse hasn't been used or the game just started,
 	// center the cursor on the board upon the first directional key press.
 	if state.SelectedX < 0 || state.SelectedY < 0 {
-		state.SelectedX = BoardCols / 2
-		state.SelectedY = BoardRows / 2
+		state.SelectedX = state.Cols / 2
+		state.SelectedY = state.Rows / 2
 	}
 
 	moved := false
@@ -101,14 +101,14 @@ func handleKeyboard(evt ttbox.Event, state *GameState, netMgr *NetworkManager, p
 	if moved {
 		if state.SelectedX < 0 {
 			state.SelectedX = 0
-		} else if state.SelectedX >= BoardCols {
-			state.SelectedX = BoardCols - 1
+		} else if state.SelectedX >= state.Cols {
+			state.SelectedX = state.Cols - 1
 		}
 
 		if state.SelectedY < 0 {
 			state.SelectedY = 0
-		} else if state.SelectedY >= BoardRows {
-			state.SelectedY = BoardRows - 1
+		} else if state.SelectedY >= state.Rows {
+			state.SelectedY = state.Rows - 1
 		}
 	}
 }
@@ -120,21 +120,23 @@ func handleMouse(evt ttbox.Event, state *GameState, netMgr *NetworkManager, play
 		return
 	}
 
+	boardWidth := state.Cols * CellWidth
+	boardHeight := state.Rows
 	w, h := ttbox.Size()
-	offsetX := (w - BoardWidth) / 2
-	offsetY := (h - BoardHeigh) / 2
+	offsetX := (w - boardWidth) / 2
+	offsetY := (h - boardHeight) / 2
 
 	relativeX := evt.X - offsetX
 	relativeY := evt.Y - offsetY
 
 	// Hide the cursor if the click is outside the board area.
-	if relativeX < 0 || relativeX >= BoardWidth || relativeY < 0 || relativeY >= BoardHeigh {
+	if relativeX < 0 || relativeX >= boardWidth || relativeY < 0 || relativeY >= boardHeight {
 		state.SelectedX = -1
 		state.SelectedY = -1
 		return
 	}
 
-	boardX := relativeX / 3
+	boardX := relativeX / CellWidth
 	boardY := relativeY
 
 	// Core mechanic: First click focuses the cell, second click on the same cell places the piece.

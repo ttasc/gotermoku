@@ -50,13 +50,15 @@ func Render(state *GameState) {
 
 // drawBoard renders the game grid, placed pieces, and the active selection cursor.
 func drawBoard(state *GameState) {
+	boardWidth := state.Cols * CellWidth
+	boardHeight := state.Rows
+
 	w, h := ttbox.Size()
+	offsetX := (w - boardWidth) / 2
+	offsetY := (h - boardHeight) / 2
 
-	offsetX := (w - BoardWidth) / 2
-	offsetY := (h - BoardHeigh) / 2
-
-	for y := range BoardRows {
-		for x := range BoardCols {
+	for y := range state.Rows {
+		for x := range state.Cols {
 			ch := CharDot
 			fg := ColorBoardGrid
 			bg := ttbox.ColorDefault
@@ -125,7 +127,7 @@ func drawStatusline(state *GameState) {
 	}
 
 	// Position the status line cleanly two rows above the board.
-	offsetY := (h - BoardHeigh) / 2
+	offsetY := (h - state.Rows) / 2
 	y := max(offsetY-2, 0) // Ensure it does not overflow if the terminal is too small.
 
 	if y != 0 {
@@ -241,12 +243,13 @@ func drawEndgamePopup(state *GameState) {
 		avgWinY /= len(state.WinningPositions)
 	}
 
-	offsetY := (h - BoardHeigh) / 2
+	boardHeight := state.Rows
+	offsetY := (h - boardHeight) / 2
 	var y int
 
 	// If the winning pieces are in the top half of the board, push the popup to the bottom.
-	if avgWinY < BoardRows/2 {
-		y = offsetY + BoardHeigh
+	if avgWinY < state.Rows/2 {
+		y = offsetY + boardHeight
 		// If the terminal is too short, force the popup to sit at the bottom edge.
 		if y+boxH > h {
 			y = h - boxH

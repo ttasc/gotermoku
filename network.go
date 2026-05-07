@@ -16,10 +16,10 @@ type NetMessage struct {
 
 	// Payload for "sync" messages (synchronizing state from the Server to the Client).
 	// A pointer is used to avoid copying the entire board array when the message type is not "sync".
-	Board            *[BoardRows][BoardCols]uint8 `json:"board,omitempty"`
-	CurrentTurn      uint8                        `json:"turn,omitempty"`
-	Winner           uint8                        `json:"winner,omitempty"`
-	WinningPositions [][2]int                     `json:"winning_positions,omitempty"`
+	Board            [][]uint8 `json:"board,omitempty"`
+	CurrentTurn      uint8     `json:"turn,omitempty"`
+	Winner           uint8     `json:"winner,omitempty"`
+	WinningPositions [][2]int  `json:"winning_positions,omitempty"`
 }
 
 // NetworkManager manages the TCP connection and background goroutines for network I/O.
@@ -116,4 +116,51 @@ func (nm *NetworkManager) Close() {
 	}
 	// Explicitly closing the channel here is omitted to prevent panics from the readLoop attempting to send
 	// to a closed channel. Go's Garbage Collector will safely clean up the channel when the process terminates.
+}
+
+// handleNetworkMessage processes incoming network messages and updates the game state accordingly.
+func handleNetworkMessage(msg NetMessage, state *GameState, netMgr *NetworkManager) {
+	switch msg.Type {
+	case "move":
+		if netMgr.IsHost {
+			if state.CurrentTurn == Black && state.Board[msg.Y][msg.X] == Empty && state.Winner == Empty {
+				state.Board[msg.Y][msg.X] = Black
+				state.MoveCount[Black]++
+				checkWin(state, msg.X, msg.Y)
+				if state.Winner == Empty {
+					state.CurrentTurn = White
+				}
+				broadcastSync(state, netMgr)
+			}
+		}
+
+	case "sync":
+		if !netMgr.IsHost {
+			state.Board = msg.Board
+			state.Rows = len(msg.Board)
+			if state.Rows > 0 {
+				state.Cols = len(msg.Board[0])
+			}
+			state.CurrentTurn = msg.CurrentTurn
+			state.Winner = msg.Winner
+			state.WinningPositions = msg.WinningPositions
+		}
+
+	case "restart":
+		if netMgr.IsHost {
+			state.Reset()
+			broadcastSync(state, netMgr)
+		}
+	}
+}
+
+// broadcastSync sends the current game state from the Host to the Client.
+func broadcastSync(state *GameState, netMgr *NetworkManager) {
+	netMgr.Send(NetMessage{
+		Type:             "sync",
+		Board:            state.Board,
+		CurrentTurn:      state.CurrentTurn,
+		Winner:           state.Winner,
+		WinningPositions: state.WinningPositions,
+	})
 }

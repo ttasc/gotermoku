@@ -29,7 +29,7 @@ func checkWin(state *GameState, lastX, lastY int) {
 			ny := lastY + (dir[1] * i)
 
 			// Stop scanning if the boundary is hit, or if a different colored/empty cell is encountered.
-			if nx < 0 || nx >= BoardCols || ny < 0 || ny >= BoardRows || state.Board[ny][nx] != color {
+			if nx < 0 || nx >= state.Cols || ny < 0 || ny >= state.Rows || state.Board[ny][nx] != color {
 				break
 			}
 			count++
@@ -41,7 +41,7 @@ func checkWin(state *GameState, lastX, lastY int) {
 			nx := lastX - (dir[0] * i)
 			ny := lastY - (dir[1] * i)
 
-			if nx < 0 || nx >= BoardCols || ny < 0 || ny >= BoardRows || state.Board[ny][nx] != color {
+			if nx < 0 || nx >= state.Cols || ny < 0 || ny >= state.Rows || state.Board[ny][nx] != color {
 				break
 			}
 			count++
