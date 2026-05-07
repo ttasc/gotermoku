@@ -34,6 +34,7 @@ const (
 
 // Render draws the current game state, and presents it to the screen.
 func Render(state *GameState) {
+	ttbox.Clear()
 
 	drawStatusline(state)
 	drawBoard(state)
@@ -126,6 +127,10 @@ func drawStatusline(state *GameState) {
 	// Position the status line cleanly two rows above the board.
 	offsetY := (h - BoardHeigh) / 2
 	y := max(offsetY-2, 0) // Ensure it does not overflow if the terminal is too small.
+
+	if y != 0 {
+		ttbox.DrawTextCenter(1, " G O T E R M O K U ", ColorText, ttbox.ColorDefault)
+	}
 
 	// Calculate elapsed time.
 	elapsed := time.Since(state.StartTime)
