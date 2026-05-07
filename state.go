@@ -23,6 +23,7 @@ type GameState struct {
 	StartTime        time.Time
 	LocalPlayerColor uint8
 	IsOnline         bool
+	IsBotMode        bool
 }
 
 func NewGameState(rows, cols int) *GameState {

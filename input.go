@@ -11,8 +11,8 @@ func tryPlacePiece(state *GameState, netMgr *NetworkManager, playerColor uint8, 
 		return false
 	}
 
-	// Check if it is the player's turn (applicable for online multiplayer).
-	if netMgr != nil && state.CurrentTurn != playerColor {
+	// Check if it is the player's turn (applicable for online multiplayer and play with bot).
+	if (netMgr != nil || state.IsBotMode) && state.CurrentTurn != playerColor {
 		return false
 	}
 

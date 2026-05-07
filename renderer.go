@@ -156,6 +156,9 @@ func drawStatusline(state *GameState) {
 			whiteLabel = " WHITE (Opp) "
 			blackLabel = " BLACK (You) "
 		}
+	} else if state.IsBotMode {
+		whiteLabel = " WHITE (You) "
+		blackLabel = " BLACK (Bot) "
 	}
 
 	whiteText := fmt.Sprintf(" %c -%s", CharWhite, whiteLabel)
@@ -188,7 +191,7 @@ func drawStatusline(state *GameState) {
 	}
 
 	// 4. Draw Turn Indicator directly under the status line (Online only)
-	if state.IsOnline && state.Winner == Empty {
+	if (state.IsOnline || state.IsBotMode) && state.Winner == Empty {
 		var turnIndicator string
 		colorStr := "WHITE"
 		if state.CurrentTurn == Black {
@@ -199,7 +202,11 @@ func drawStatusline(state *GameState) {
 			turnIndicator = fmt.Sprintf(" YOUR TURN (%s) ", colorStr)
 			ttbox.DrawTextCenter(y+1, turnIndicator, ColorSelValid, ttbox.ColorDefault)
 		} else {
-			turnIndicator = fmt.Sprintf(" OPPONENT'S TURN (%s) ", colorStr)
+			oppName := "OPPONENT'S"
+			if state.IsBotMode {
+				oppName = "BOT'S"
+			}
+			turnIndicator = fmt.Sprintf(" %s TURN (%s) ", oppName, colorStr)
 			ttbox.DrawTextCenter(y+1, turnIndicator, ColorTextDim, ttbox.ColorDefault)
 		}
 	}

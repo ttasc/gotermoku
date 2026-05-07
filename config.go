@@ -9,12 +9,13 @@ import (
 )
 
 type GameConfig struct {
-	Rows     int
-	Cols     int
-	IsOnline bool
-	IsHost   bool
-	JoinAddr string
-	Port     string
+	Rows      int
+	Cols      int
+	IsBotMode bool
+	IsOnline  bool
+	IsHost    bool
+	JoinAddr  string
+	Port      string
 }
 
 // printUsage displays the command-line help message.
@@ -24,12 +25,13 @@ func printUsage() {
 	fmt.Println("  gotermoku [options]")
 	fmt.Println("\nOptions:")
 	fmt.Println("  -h, --help       Show this help message")
+	fmt.Println("  -s, --size       Specify board size as ROWSxCOLS (default: 20x30, min: 3x3)")
+	fmt.Println("  --bot            Play against AI in offline mode")
 	fmt.Println("  --host           Enable online mode and act as the Host (Server)")
 	fmt.Println("  --join ADDRESS   Enable online mode and connect to a Host at ADDRESS")
 	fmt.Println("  --port PORT      Specify the port to listen on or connect to (default: 3333)")
-	fmt.Println("  -s, --size       Specify board size as ROWSxCOLS (default: 20x30, min: 3x3)")
 	fmt.Println("\nExamples:")
-	fmt.Println("  Offline Mode : gotermoku -s 15x15")
+	fmt.Println("  Offline Mode : gotermoku -s 15x15 --bot")
 	fmt.Println("  Host a Game  : gotermoku --host --port 9000")
 	fmt.Println("  Join a Game  : gotermoku --join 192.168.1.10 --port 9000")
 }
@@ -39,6 +41,7 @@ func ParseConfig() *GameConfig {
 		helpFlag bool
 		hFlag    bool
 		hostFlag bool
+		botFlag  bool
 		joinAddr string
 		port     string
 		sizeStr  string
@@ -47,6 +50,7 @@ func ParseConfig() *GameConfig {
 	flag.BoolVar(&helpFlag, "help", false, "Show help message")
 	flag.BoolVar(&hFlag, "h", false, "Show help message")
 	flag.BoolVar(&hostFlag, "host", false, "Act as Host")
+	flag.BoolVar(&botFlag, "bot", false, "Play against AI")
 	flag.StringVar(&joinAddr, "join", "", "IP address to join")
 	flag.StringVar(&port, "port", "3333", "Port to use")
 	flag.StringVar(&sizeStr, "size", "20x30", "Board size (ROWSxCOLS)")
@@ -58,6 +62,12 @@ func ParseConfig() *GameConfig {
 	if helpFlag || hFlag {
 		printUsage()
 		os.Exit(0)
+	}
+
+	if botFlag && (hostFlag || joinAddr != "") {
+		fmt.Println("Error: Cannot use --bot with online modes (--host or --join).")
+		printUsage()
+		os.Exit(1)
 	}
 
 	if hostFlag && joinAddr != "" {
@@ -80,11 +90,12 @@ func ParseConfig() *GameConfig {
 	}
 
 	return &GameConfig{
-		Rows:     rows,
-		Cols:     cols,
-		IsOnline: hostFlag || joinAddr != "",
-		IsHost:   hostFlag,
-		JoinAddr: joinAddr,
-		Port:     port,
+		Rows:      rows,
+		Cols:      cols,
+		IsOnline:  hostFlag || joinAddr != "",
+		IsHost:    hostFlag,
+		IsBotMode: botFlag,
+		JoinAddr:  joinAddr,
+		Port:      port,
 	}
 }

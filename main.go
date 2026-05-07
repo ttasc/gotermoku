@@ -10,6 +10,7 @@ func main() {
 
 	state := NewGameState(cfg.Rows, cfg.Cols)
 	state.IsOnline = cfg.IsOnline
+	state.IsBotMode = cfg.IsBotMode
 	state.LocalPlayerColor = White
 
 	var netMgr *NetworkManager

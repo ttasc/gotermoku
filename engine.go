@@ -45,7 +45,29 @@ func RunGame(state *GameState, netMgr *NetworkManager) {
 	playerColor := state.LocalPlayerColor
 	isRunning := true
 
+	// Channel giao tiếp với Bot và cờ chống trùng lặp
+	botMoves := make(chan [2]int, 1)
+	botThinking := false
+
 	for isRunning {
+		// --- BỔ SUNG LOGIC GỌI BOT TẠI ĐÂY ---
+		if state.IsBotMode && state.CurrentTurn == Black && state.Winner == Empty && !botThinking {
+			botThinking = true
+			go func(currentState *GameState) {
+				// Giả lập thời gian bot "suy nghĩ" để UX mượt mà (0.4s)
+				time.Sleep(400 * time.Millisecond)
+				move := getBotMove(currentState)
+				botMoves <- move
+			}(state)
+		}
+
+		// Nhận nước đi của Bot (Không block UI)
+		select {
+		case move := <-botMoves:
+			botThinking = false
+			tryPlacePiece(state, netMgr, Black, move[0], move[1]) // Bot cầm Đen
+		default:
+		}
 		// Network Handler
 		if netMgr != nil {
 			select {
