@@ -8,7 +8,6 @@ import (
 	"strings"
 )
 
-// GameConfig lưu trữ toàn bộ cấu hình khởi chạy game
 type GameConfig struct {
 	Rows     int
 	Cols     int
@@ -35,7 +34,6 @@ func printUsage() {
 	fmt.Println("  Join a Game  : gotermoku --join 192.168.1.10 --port 9000")
 }
 
-// ParseConfig đọc và validate các flags từ Command Line
 func ParseConfig() *GameConfig {
 	var (
 		helpFlag bool

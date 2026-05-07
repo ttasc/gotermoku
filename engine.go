@@ -8,7 +8,6 @@ import (
 	"github.com/ttasc/ttbox"
 )
 
-// RunGame khởi tạo UI và chạy vòng lặp vô tận của game
 func RunGame(state *GameState, netMgr *NetworkManager) {
 	if err := ttbox.Init(); err != nil {
 		fmt.Printf("Error initializing TUI: %v\n", err)
@@ -18,7 +17,7 @@ func RunGame(state *GameState, netMgr *NetworkManager) {
 
 	// Validate terminal size
 	termW, termH := ttbox.Size()
-	maxCols := termW / 3 // Giả định CellWidth = 3
+	maxCols := termW / CellWidth
 	maxRows := termH - 6
 
 	if state.Cols > maxCols || state.Rows > maxRows {
@@ -47,7 +46,7 @@ func RunGame(state *GameState, netMgr *NetworkManager) {
 	isRunning := true
 
 	for isRunning {
-		// 1. Lắng nghe mạng
+		// Network Handler
 		if netMgr != nil {
 			select {
 			case msg := <-netMgr.Incoming:
@@ -58,11 +57,11 @@ func RunGame(state *GameState, netMgr *NetworkManager) {
 				}
 				handleNetworkMessage(msg, state, netMgr)
 			default:
-				// Không block game loop
+				// none-blocking game
 			}
 		}
 
-		// 2. Lắng nghe Input
+		// Input Handler
 		evt, err := ttbox.PollEventTimeout(16 * time.Millisecond)
 		if err == nil {
 			switch evt.Type {
@@ -89,7 +88,6 @@ func RunGame(state *GameState, netMgr *NetworkManager) {
 			}
 		}
 
-		// 3. Render
 		Render(state)
 	}
 }
