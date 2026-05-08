@@ -29,7 +29,7 @@ const (
 	ColorText     = 250 // Light gray text.
 	ColorTextDim  = 240 // Dim gray text (for the inactive player).
 	ColorBgActive = 236 // Dark gray background (highlights the active player).
-	ColorBgModal  = 235 // Background color for the popup modal.
+	ColorBgModal  = 235 // Background color for modals or contrasting blocks.
 )
 
 // Render draws the current game state, and presents it to the screen.
@@ -40,15 +40,16 @@ func Render(state *GameState) {
 	drawBoard(state)
 
 	if state.Winner != Empty {
-		drawEndgamePopup(state)
+		drawEndgameBanner(state)
+	} else {
+		drawControlsGuide()
 	}
-
-	drawControlsGuide()
 
 	ttbox.Present()
 }
 
 // drawBoard renders the game grid, placed pieces, and the active selection cursor.
+// Winning pieces are prominently highlighted with a background color.
 func drawBoard(state *GameState) {
 	boardWidth := state.Cols * CellWidth
 	boardHeight := state.Rows
@@ -85,7 +86,8 @@ func drawBoard(state *GameState) {
 			}
 
 			if isWinPos {
-				fg = ColorWin
+				fg = ColorBgModal // Dark contrast for the text.
+				bg = ColorWin     // Prominent solid background block.
 			}
 
 			screenX := offsetX + (x * 3)
@@ -103,6 +105,10 @@ func drawBoard(state *GameState) {
 				if state.Board[y][x] != Empty {
 					bracketFg = ColorSelInvalid
 				}
+			}
+
+			if isWinPos && x == state.SelectedX && y == state.SelectedY {
+				bracketFg = ColorBgModal // Match the piece's text color for consistency in winning sequence.
 			}
 
 			// Draw the left bracket or a space.
@@ -223,66 +229,24 @@ func drawControlsGuide() {
 	ttbox.DrawTextCenter(h-1, guideText, ColorText, ttbox.ColorDefault)
 }
 
-// drawEndgamePopup displays a modal dialogue when the game concludes, showing the winner and restart instructions.
-func drawEndgamePopup(state *GameState) {
+// drawEndgameBanner displays the game result prominently at the bottom of the screen without covering the board.
+func drawEndgameBanner(state *GameState) {
 	w, h := ttbox.Size()
+	if w == 0 || h == 0 {
+		return
+	}
 
-	msgFg := ColorWin
-	msg := " WHITE WINS! "
+	msg := " ★ WHITE WINS! ★ "
 	if state.Winner == Black {
-		msg = " BLACK WINS! "
+		msg = " ★ BLACK WINS! ★ "
 	}
-	subMsg := "[R] Play Again   [ESC] Exit "
+	subMsg := " [R] Play Again   [ESC] Exit "
 
-	// Modal dimensions.
-	boxW := len(subMsg) + 6
-	boxH := 4
-
-	x := (w - boxW) / 2
-
-	// --- SMART POSITIONING ---
-	avgWinY := 0
-	if len(state.WinningPositions) > 0 {
-		for _, pos := range state.WinningPositions {
-			avgWinY += pos[1] // Accumulate the Y coordinates of the winning pieces (0 to Rows-1).
-		}
-		avgWinY /= len(state.WinningPositions)
-	}
-
-	boardHeight := state.Rows
-	offsetY := (h - boardHeight) / 2
-	var y int
-
-	if avgWinY < state.Rows/2 {
-		// Victory occurs in the top half -> Place the popup close to the bottom edge of the chessboard
-		y = offsetY + boardHeight
-
-		// Constraint: Do not let the popup overwrite the Controls Guide line in h-1.
-		if y+boxH > h-1 {
-			y = h - 1 - boxH
-		}
-	} else {
-		// Victory occurs in the bottom half -> Move the popup to the "middle-up" part of the chessboard
-		// DO NOT push y < offsetY to protect the status bar/Timer above.
-		y = max(offsetY+(state.Rows/2-boxH/2)-1, offsetY) // Safety constraint: If the chessboard is too small, make it sit right at the top of the board.
-	}
-
-	// Clear the modal background area.
-	ttbox.SetColor(ColorText, ColorBgModal)
-	ttbox.Fill(x, y, boxW, boxH, ' ')
-
-	// Draw the modal border box.
-	ttbox.SetColor(ColorBoardGrid, ColorBgModal)
-	ttbox.Box(x, y, boxW, boxH)
-
-	// Draw the bold winning message.
+	// Draw the main victory message.
 	ttbox.SetAttr(true, false, false, false)
-	ttbox.DrawTextCenter(y+1, msg, msgFg, ColorBgModal)
+	ttbox.DrawTextCenter(h-2, msg, ColorWin, ttbox.ColorDefault)
 	ttbox.ResetAttr()
 
-	// Draw the instructional sub-message.
-	ttbox.DrawTextCenter(y+2, subMsg, ColorTextDim, ColorBgModal)
-
-	// Reset to default system colors.
-	ttbox.SetColor(ttbox.ColorDefault, ttbox.ColorDefault)
+	// Draw the sub-message for key actions.
+	ttbox.DrawTextCenter(h-1, subMsg, ColorTextDim, ttbox.ColorDefault)
 }
