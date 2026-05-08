@@ -84,7 +84,7 @@ func RunGame(state *GameState, netMgr *NetworkManager) {
 		}
 
 		// Input Handler
-		evt, err := ttbox.PollEventTimeout(16 * time.Millisecond)
+		evt, err := ttbox.PollEventTimeout(500 * time.Millisecond)
 		if err == nil {
 			switch evt.Type {
 			case ttbox.EventKey:
