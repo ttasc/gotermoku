@@ -236,9 +236,9 @@ func drawEndgameBanner(state *GameState) {
 		return
 	}
 
-	msg := " ★ WHITE WINS! ★ "
+	msg := " * WHITE WINS! * "
 	if state.Winner == Black {
-		msg = " ★ BLACK WINS! ★ "
+		msg = " * BLACK WINS! * "
 	}
 	subMsg := " [R] Play Again   [ESC] Exit "
 
