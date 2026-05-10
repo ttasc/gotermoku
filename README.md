@@ -17,13 +17,11 @@ A lightweight implementation of Gomoku (Five in a Row) built specifically for th
 
 ## Features
 
-- Local offline play (hotseat mode).
-- Single-player mode against a *built-in* `Heuristic AI Bot`.
-- Customizable board sizes (dynamic scaling) with terminal capacity validation.
-- *Peer-to-peer* TCP multiplayer (Host/Client configuration).
-- Standard Arrow and Vim-style (*HJKL*) movement keys.
-- Two-click mouse interactions (focus, then place).
-- Stateless UI rendering with a minimalist pastel color scheme.
+- **Offline**: Local offline play (hotseat mode).
+- **AI Bot**: Single-player mode against a *built-in* `Heuristic AI Bot`.
+- **P2P online**: *Peer-to-peer* TCP multiplayer (Host/Client configuration).
+- **Vim-key**: Standard Arrow and Vim-style (*HJKL*) movement keys.
+- **Mouse control**: Two-click mouse interactions (focus, then place).
 
 ## Architecture
 
