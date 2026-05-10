@@ -1,4 +1,4 @@
-# 🎮 gotermoku
+# ⭕ gotermoku
 
 A minimal, terminal-based Gomoku game written in Go.
 
