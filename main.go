@@ -6,7 +6,15 @@ import (
 )
 
 func main() {
-	cfg := ParseConfig()
+	cfg, err := ParseConfig(os.Args[1:])
+	if err != nil {
+		if err.Error() == "help" {
+			PrintUsage()
+			os.Exit(0)
+		}
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
+	}
 
 	state := NewGameState(cfg.Rows, cfg.Cols)
 	state.IsOnline = cfg.IsOnline
@@ -15,14 +23,13 @@ func main() {
 
 	var netMgr *NetworkManager
 	if cfg.IsOnline {
-		var err error
 		if cfg.IsHost {
 			fmt.Printf("Starting Host... Waiting for client to connect on port %s...\n", cfg.Port)
 			netMgr, err = HostGame(cfg.Port)
 		} else {
-			address := fmt.Sprintf("%s:%s", cfg.JoinAddr, cfg.Port)
-			fmt.Printf("Connecting to Host at %s...\n", address)
-			netMgr, err = JoinGame(address)
+			addr := fmt.Sprintf("%s:%s", cfg.JoinAddr, cfg.Port)
+			fmt.Printf("Connecting to Host at %s...\n", addr)
+			netMgr, err = JoinGame(addr)
 			state.LocalPlayerColor = Black
 		}
 

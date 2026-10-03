@@ -7,32 +7,27 @@ import (
 	"github.com/ttasc/ttbox"
 )
 
-// Modern character design for the board pieces and grid.
 const (
-	CharDot          = '·' // Grid intersection point.
-	CharWhite        = 'O' // White piece
-	CharBlack        = 'X' // Black piece
+	CharDot          = '·'
+	CharWhite        = 'O'
+	CharBlack        = 'X'
 	CharLeftBracket  = '['
 	CharRightBracket = ']'
 )
 
-// Modern and minimalist xterm-256 color palette (Pastel & Minimalist).
 const (
-	ColorBoardGrid  = 239 // Dark gray for the grid.
-	ColorWhitePiece = 255 // Pure white.
-	ColorBlackPiece = 245 // Light gray (suitable for both dark and light terminal backgrounds).
-
-	ColorSelValid   = 39  // Bright blue (indicates a valid selection).
-	ColorSelInvalid = 196 // Red (when selecting none-Empty position)
-	ColorWin        = 114 // Pastel green (indicates winning pieces).
-
-	ColorText     = 250 // Light gray text.
-	ColorTextDim  = 240 // Dim gray text (for the inactive player).
-	ColorBgActive = 236 // Dark gray background (highlights the active player).
-	ColorBgModal  = 235 // Background color for modals or contrasting blocks.
+	ColorBoardGrid  = 239
+	ColorWhitePiece = 255
+	ColorBlackPiece = 245
+	ColorSelValid   = 39
+	ColorSelInvalid = 196
+	ColorWin        = 114
+	ColorText       = 250
+	ColorTextDim    = 240
+	ColorBgActive   = 236
+	ColorBgModal    = 235
 )
 
-// Render draws the current game state, and presents it to the screen.
 func Render(state *GameState) {
 	ttbox.Clear()
 
@@ -48,205 +43,156 @@ func Render(state *GameState) {
 	ttbox.Present()
 }
 
-// drawBoard renders the game grid, placed pieces, and the active selection cursor.
-// Winning pieces are prominently highlighted with a background color.
 func drawBoard(state *GameState) {
-	boardWidth := state.Cols * CellWidth
-	boardHeight := state.Rows
-
 	w, h := ttbox.Size()
-	offsetX := (w - boardWidth) / 2
-	offsetY := (h - boardHeight) / 2
+	offsetX := (w - (state.Cols * CellWidth)) / 2
+	offsetY := (h - state.Rows) / 2
 
-	for y := range state.Rows {
-		for x := range state.Cols {
-			ch := CharDot
-			fg := ColorBoardGrid
-			bg := ttbox.ColorDefault
-
-			// Determine the piece representation.
-			switch state.Board[y][x] {
-			case White:
-				ch = CharWhite
-				fg = ColorWhitePiece
-			case Black:
-				ch = CharBlack
-				fg = ColorBlackPiece
-			}
-
-			// Check if this cell is part of the winning sequence.
-			isWinPos := false
-			if state.Winner != Empty {
-				for _, pos := range state.WinningPositions {
-					if x == pos[0] && y == pos[1] {
-						isWinPos = true
-						break
-					}
-				}
-			}
-
-			if isWinPos {
-				fg = ColorBgModal // Dark contrast for the text.
-				bg = ColorWin     // Prominent solid background block.
-			}
-
-			screenX := offsetX + (x * 3)
-			screenY := offsetY + y
-
-			// Handle cursor selection effects.
-			leftChar, rightChar := ' ', ' '
-			bracketFg := ColorSelValid
-
-			if x == state.SelectedX && y == state.SelectedY {
-				leftChar = CharLeftBracket
-				rightChar = CharRightBracket
-
-				// Selection effect turn red if not Empty
-				if state.Board[y][x] != Empty {
-					bracketFg = ColorSelInvalid
-				}
-			}
-
-			if isWinPos && x == state.SelectedX && y == state.SelectedY {
-				bracketFg = ColorBgModal // Match the piece's text color for consistency in winning sequence.
-			}
-
-			// Draw the left bracket or a space.
-			ttbox.SetCell(screenX-1, screenY, leftChar, bracketFg, bg)
-
-			// Draw the piece or grid intersection point in bold.
-			ttbox.SetAttr(true, false, false, false)
-			ttbox.SetCell(screenX, screenY, ch, fg, bg)
-			ttbox.ResetAttr() // Reset text formatting.
-
-			// Draw the right bracket or a space.
-			ttbox.SetCell(screenX+1, screenY, rightChar, bracketFg, bg)
+	for y := 0; y < state.Rows; y++ {
+		for x := 0; x < state.Cols; x++ {
+			drawCell(state, x, y, offsetX, offsetY)
 		}
 	}
 }
 
-// drawStatusline renders the top information bar, including the players, active turn indicator, and elapsed time.
+func drawCell(state *GameState, x, y, offsetX, offsetY int) {
+	ch, fg, bg := CharDot, ColorBoardGrid, ttbox.ColorDefault
+	isWinPos := state.IsWinPos(x, y)
+
+	switch state.Board[y][x] {
+	case White:
+		ch, fg = CharWhite, ColorWhitePiece
+	case Black:
+		ch, fg = CharBlack, ColorBlackPiece
+	}
+
+	if isWinPos {
+		fg, bg = ColorBgModal, ColorWin
+	}
+
+	screenX, screenY := offsetX+(x*CellWidth), offsetY+y
+	drawCursor(state, x, y, screenX, screenY, isWinPos, bg)
+
+	ttbox.SetAttr(true, false, false, false)
+	ttbox.SetCell(screenX, screenY, ch, fg, bg)
+	ttbox.ResetAttr()
+}
+
+func drawCursor(state *GameState, x, y, screenX, screenY int, isWinPos bool, bg int) {
+	leftChar, rightChar := ' ', ' '
+	bracketFg := ColorSelValid
+
+	if x == state.SelectedX && y == state.SelectedY {
+		leftChar, rightChar = CharLeftBracket, CharRightBracket
+		if state.Board[y][x] != Empty {
+			bracketFg = ColorSelInvalid
+		}
+	}
+
+	if isWinPos && leftChar != ' ' {
+		bracketFg = ColorBgModal
+	}
+
+	ttbox.SetCell(screenX-1, screenY, leftChar, bracketFg, bg)
+	ttbox.SetCell(screenX+1, screenY, rightChar, bracketFg, bg)
+}
+
 func drawStatusline(state *GameState) {
 	w, h := ttbox.Size()
 	if w == 0 || h == 0 {
 		return
 	}
 
-	// Position the status line cleanly two rows above the board.
-	offsetY := (h - state.Rows) / 2
-	y := max(offsetY-2, 0) // Ensure it does not overflow if the terminal is too small.
-
+	y := max((h-state.Rows)/2-2, 0)
 	if y != 0 {
 		ttbox.DrawTextCenter(1, " G O T E R M O K U ", ColorText, ttbox.ColorDefault)
 	}
 
-	// Calculate elapsed time.
-	elapsed := time.Since(state.StartTime)
-	hours := int(elapsed.Hours())
-	mins := int(elapsed.Minutes()) % 60
-	secs := int(elapsed.Seconds()) % 60
-	timerText := fmt.Sprintf("  %02d:%02d:%02d  ", hours, mins, secs)
-
-	// Center the entire status line horizontally.
+	timerText := formatTimer(time.Since(state.StartTime))
 	centerX := w / 2
 
-	whiteLabel := " WHITE "
-	blackLabel := " BLACK "
+	whiteText, blackText := getPlayerLabels(state)
+	whiteFg, whiteBg, blackFg, blackBg := getPlayerColors(state)
 
-	// Append tags to identify which player is playing on the local terminal.
-	if state.IsOnline {
-		if state.LocalPlayerColor == White {
-			whiteLabel = " WHITE (You) "
-			blackLabel = " BLACK (Opp) "
-		} else {
-			whiteLabel = " WHITE (Opp) "
-			blackLabel = " BLACK (You) "
-		}
-	} else if state.IsBotMode {
-		whiteLabel = " WHITE (You) "
-		blackLabel = " BLACK (Bot) "
-	}
-
-	whiteText := fmt.Sprintf(" %c -%s", CharWhite, whiteLabel)
-	blackText := fmt.Sprintf(" %c -%s", CharBlack, blackLabel)
-
-	whiteFg, whiteBg := ColorTextDim, ttbox.ColorDefault
-	blackFg, blackBg := ColorTextDim, ttbox.ColorDefault
-
-	// Highlight the active player's turn.
-	switch state.CurrentTurn {
-	case White:
-		whiteFg, whiteBg = ColorWhitePiece, ColorBgActive
-	case Black:
-		blackFg, blackBg = ColorWhitePiece, ColorBgActive
-	}
-
-	// 1. Draw Player 1 (White) to the left of the timer.
 	p1X := centerX - (len(timerText) / 2) - len(whiteText)
 	for i, ch := range whiteText {
 		ttbox.SetCell(p1X+i, y, ch, whiteFg, whiteBg)
 	}
 
-	// 2. Draw the Timer (Center).
 	ttbox.DrawTextCenter(y, timerText, ColorText, ttbox.ColorDefault)
 
-	// 3. Draw Player 2 (Black) to the right of the timer.
 	p2X := centerX + (len(timerText) / 2) + (len(timerText) % 2)
 	for i, ch := range blackText {
 		ttbox.SetCell(p2X+i, y, ch, blackFg, blackBg)
 	}
 
-	// 4. Draw Turn Indicator directly under the status line (Online only)
-	if (state.IsOnline || state.IsBotMode) && state.Winner == Empty {
-		var turnIndicator string
-		colorStr := "WHITE"
-		if state.CurrentTurn == Black {
-			colorStr = "BLACK"
-		}
+	drawTurnIndicator(state, y+1)
+}
 
-		if state.CurrentTurn == state.LocalPlayerColor {
-			turnIndicator = fmt.Sprintf(" YOUR TURN (%s) ", colorStr)
-			ttbox.DrawTextCenter(y+1, turnIndicator, ColorSelValid, ttbox.ColorDefault)
+func formatTimer(elapsed time.Duration) string {
+	hours, mins, secs := int(elapsed.Hours()), int(elapsed.Minutes())%60, int(elapsed.Seconds())%60
+	return fmt.Sprintf("  %02d:%02d:%02d  ", hours, mins, secs)
+}
+
+func getPlayerLabels(state *GameState) (string, string) {
+	wLabel, bLabel := " WHITE ", " BLACK "
+	if state.IsOnline {
+		if state.LocalPlayerColor == White {
+			wLabel, bLabel = " WHITE (You) ", " BLACK (Opp) "
 		} else {
-			oppName := "OPPONENT'S"
-			if state.IsBotMode {
-				oppName = "BOT'S"
-			}
-			turnIndicator = fmt.Sprintf(" %s TURN (%s) ", oppName, colorStr)
-			ttbox.DrawTextCenter(y+1, turnIndicator, ColorTextDim, ttbox.ColorDefault)
+			wLabel, bLabel = " WHITE (Opp) ", " BLACK (You) "
 		}
+	} else if state.IsBotMode {
+		wLabel, bLabel = " WHITE (You) ", " BLACK (Bot) "
+	}
+	return fmt.Sprintf(" %c -%s", CharWhite, wLabel), fmt.Sprintf(" %c -%s", CharBlack, bLabel)
+}
+
+func getPlayerColors(state *GameState) (int, int, int, int) {
+	wFg, wBg, bFg, bBg := ColorTextDim, ttbox.ColorDefault, ColorTextDim, ttbox.ColorDefault
+	if state.CurrentTurn == White {
+		wFg, wBg = ColorWhitePiece, ColorBgActive
+	} else {
+		bFg, bBg = ColorWhitePiece, ColorBgActive
+	}
+	return wFg, wBg, bFg, bBg
+}
+
+func drawTurnIndicator(state *GameState, y int) {
+	if (!state.IsOnline && !state.IsBotMode) || state.Winner != Empty {
+		return
+	}
+
+	colorStr := "WHITE"
+	if state.CurrentTurn == Black {
+		colorStr = "BLACK"
+	}
+
+	if state.CurrentTurn == state.LocalPlayerColor {
+		ttbox.DrawTextCenter(y, fmt.Sprintf(" YOUR TURN (%s) ", colorStr), ColorSelValid, ttbox.ColorDefault)
+	} else {
+		oppName := "OPPONENT'S"
+		if state.IsBotMode {
+			oppName = "BOT'S"
+		}
+		ttbox.DrawTextCenter(y, fmt.Sprintf(" %s TURN (%s) ", oppName, colorStr), ColorTextDim, ttbox.ColorDefault)
 	}
 }
 
-// drawControlsGuide renders the bottom instructions bar to help players with keybindings.
 func drawControlsGuide() {
-	w, h := ttbox.Size()
-	if w == 0 || h == 0 {
-		return
-	}
-
-	guideText := " Move(h, j, k, l; arrows)   Place(space, enter; left-click twice)   Quit(Ctrl+C, Esc) "
-	ttbox.DrawTextCenter(h-1, guideText, ColorText, ttbox.ColorDefault)
+	_, h := ttbox.Size()
+	ttbox.DrawTextCenter(h-1, " Move(h, j, k, l; arrows)   Place(space, enter; left-click twice)   Quit(Ctrl+C, Esc) ", ColorText, ttbox.ColorDefault)
 }
 
-// drawEndgameBanner displays the game result prominently at the bottom of the screen without covering the board.
 func drawEndgameBanner(state *GameState) {
-	w, h := ttbox.Size()
-	if w == 0 || h == 0 {
-		return
-	}
-
+	_, h := ttbox.Size()
 	msg := " * WHITE WINS! * "
 	if state.Winner == Black {
 		msg = " * BLACK WINS! * "
 	}
-	subMsg := " [R] Play Again   [ESC] Exit "
 
-	// Draw the main victory message.
 	ttbox.SetAttr(true, false, false, false)
 	ttbox.DrawTextCenter(h-2, msg, ColorWin, ttbox.ColorDefault)
 	ttbox.ResetAttr()
-
-	// Draw the sub-message for key actions.
-	ttbox.DrawTextCenter(h-1, subMsg, ColorTextDim, ttbox.ColorDefault)
+	ttbox.DrawTextCenter(h-1, " [R] Play Again   [ESC] Exit ", ColorTextDim, ttbox.ColorDefault)
 }

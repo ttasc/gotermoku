@@ -38,13 +38,11 @@ func NewGameState(rows, cols int) *GameState {
 		Cols:             cols,
 		CurrentTurn:      White,
 		MoveCount:        map[uint8]int{White: 0, Black: 0},
-		Winner:           Empty,
 		WinningPositions: make([][2]int, 0),
 		SelectedX:        -1,
 		SelectedY:        -1,
 		StartTime:        time.Now(),
 		LocalPlayerColor: White,
-		IsOnline:         false,
 	}
 }
 
@@ -61,4 +59,16 @@ func (s *GameState) Reset() {
 	s.SelectedX = -1
 	s.SelectedY = -1
 	s.StartTime = time.Now()
+}
+
+func (s *GameState) IsWinPos(x, y int) bool {
+	if s.Winner == Empty {
+		return false
+	}
+	for _, pos := range s.WinningPositions {
+		if x == pos[0] && y == pos[1] {
+			return true
+		}
+	}
+	return false
 }
