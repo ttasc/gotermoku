@@ -1,6 +1,9 @@
-package main
+package ui
 
-import "github.com/ttasc/ttbox"
+import (
+	"github.com/ttasc/gotermoku/internal/core"
+	"github.com/ttasc/ttbox"
+)
 
 const (
 	ActionNone = iota
@@ -14,8 +17,7 @@ type InputIntent struct {
 	X, Y   int
 }
 
-// HandleInput translates raw physical events into logical intents.
-func HandleInput(evt ttbox.Event, state *GameState) InputIntent {
+func HandleInput(evt ttbox.Event, state *core.GameState) InputIntent {
 	if evt.Type == ttbox.EventKey {
 		return handleKeyboard(evt, state)
 	} else if evt.Type == ttbox.EventMouse {
@@ -24,11 +26,11 @@ func HandleInput(evt ttbox.Event, state *GameState) InputIntent {
 	return InputIntent{Action: ActionNone}
 }
 
-func handleKeyboard(evt ttbox.Event, state *GameState) InputIntent {
+func handleKeyboard(evt ttbox.Event, state *core.GameState) InputIntent {
 	if evt.Key == ttbox.KeyEscape || evt.Key == ttbox.KeyCtrlC || evt.Ch == 'q' || evt.Ch == 'Q' {
 		return InputIntent{Action: ActionQuit}
 	}
-	if state.Winner != Empty && (evt.Ch == 'r' || evt.Ch == 'R') {
+	if state.Winner != core.Empty && (evt.Ch == 'r' || evt.Ch == 'R') {
 		return InputIntent{Action: ActionRestart}
 	}
 
@@ -36,21 +38,29 @@ func handleKeyboard(evt ttbox.Event, state *GameState) InputIntent {
 		state.SelectedX, state.SelectedY = state.Cols/2, state.Rows/2
 	}
 
-	moved, place := false, false
+	if processMovement(evt, state) {
+		return InputIntent{Action: ActionNone}
+	}
 
+	if evt.Key == ttbox.KeyEnter || evt.Ch == ' ' {
+		return InputIntent{Action: ActionPlace, X: state.SelectedX, Y: state.SelectedY}
+	}
+	return InputIntent{Action: ActionNone}
+}
+
+func processMovement(evt ttbox.Event, state *core.GameState) bool {
+	moved := false
 	switch evt.Key {
 	case ttbox.KeyArrowUp: state.SelectedY--; moved = true
 	case ttbox.KeyArrowDown: state.SelectedY++; moved = true
 	case ttbox.KeyArrowLeft: state.SelectedX--; moved = true
 	case ttbox.KeyArrowRight: state.SelectedX++; moved = true
-	case ttbox.KeyEnter: place = true
 	default:
 		switch evt.Ch {
 		case 'k', 'K': state.SelectedY--; moved = true
 		case 'j', 'J': state.SelectedY++; moved = true
 		case 'h', 'H': state.SelectedX--; moved = true
 		case 'l', 'L': state.SelectedX++; moved = true
-		case ' ': place = true
 		}
 	}
 
@@ -58,14 +68,10 @@ func handleKeyboard(evt ttbox.Event, state *GameState) InputIntent {
 		state.SelectedX = max(0, min(state.SelectedX, state.Cols-1))
 		state.SelectedY = max(0, min(state.SelectedY, state.Rows-1))
 	}
-
-	if place {
-		return InputIntent{Action: ActionPlace, X: state.SelectedX, Y: state.SelectedY}
-	}
-	return InputIntent{Action: ActionNone}
+	return moved
 }
 
-func handleMouse(evt ttbox.Event, state *GameState) InputIntent {
+func handleMouse(evt ttbox.Event, state *core.GameState) InputIntent {
 	if !evt.Press || evt.Button != ttbox.MouseLeft {
 		return InputIntent{Action: ActionNone}
 	}

@@ -1,13 +1,17 @@
-package main
+package netio
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net"
+	"os"
+
+	"github.com/ttasc/gotermoku/internal/config"
+	"github.com/ttasc/gotermoku/internal/core"
 )
 
-// GameTransport decouples the network protocol from the game loop.
-type GameTransport interface {
+type Transport interface {
 	Send(msg NetMessage) error
 	Receive() <-chan NetMessage
 	Close()
@@ -23,14 +27,36 @@ type NetMessage struct {
 	WinningPositions [][2]int   `json:"winning_positions,omitempty"`
 }
 
-// TCPTransport is a concrete implementation of GameTransport.
 type TCPTransport struct {
 	conn     net.Conn
 	encoder  *json.Encoder
 	incoming chan NetMessage
 }
 
-func NewTCPTransport(conn net.Conn) *TCPTransport {
+func InitTransport(cfg *config.Config) Transport {
+	var conn net.Conn
+	var err error
+
+	if cfg.IsHost {
+		fmt.Printf("Starting Host... Waiting for client to connect on port %s...\n", cfg.Port)
+		ln, lnErr := net.Listen("tcp", ":"+cfg.Port)
+		if lnErr != nil {
+			fmt.Printf("Network error: %v\n", lnErr)
+			os.Exit(1)
+		}
+		conn, err = ln.Accept()
+		ln.Close()
+	} else {
+		addr := fmt.Sprintf("%s:%s", cfg.JoinAddr, cfg.Port)
+		fmt.Printf("Connecting to Host at %s...\n", addr)
+		conn, err = net.Dial("tcp", addr)
+	}
+
+	if err != nil {
+		fmt.Printf("Connection error: %v\n", err)
+		os.Exit(1)
+	}
+
 	t := &TCPTransport{
 		conn:     conn,
 		encoder:  json.NewEncoder(conn),
@@ -38,6 +64,19 @@ func NewTCPTransport(conn net.Conn) *TCPTransport {
 	}
 	go t.readLoop()
 	return t
+}
+
+func BroadcastSync(state *core.GameState, t Transport) {
+	if t == nil {
+		return
+	}
+	t.Send(NetMessage{
+		Type:             "sync",
+		Board:            state.Board,
+		CurrentTurn:      state.CurrentTurn,
+		Winner:           state.Winner,
+		WinningPositions: state.WinningPositions,
+	})
 }
 
 func (t *TCPTransport) readLoop() {

@@ -1,11 +1,15 @@
-package main
+package ui
 
 import (
 	"fmt"
+	"os"
 	"time"
 
+	"github.com/ttasc/gotermoku/internal/core"
 	"github.com/ttasc/ttbox"
 )
+
+const CellWidth = 3
 
 const (
 	CharDot          = '·'
@@ -15,7 +19,6 @@ const (
 	CharRightBracket = ']'
 )
 
-// Colors as plain integers
 const (
 	ColorDefault    int = ttbox.ColorDefault
 	ColorBoardGrid  int = 239
@@ -30,20 +33,42 @@ const (
 	ColorBgModal    int = 235
 )
 
-// RenderOpts dictates contextual information for the view layer
 type RenderOpts struct {
-	LocalColor    uint8  // White, Black, or Empty (Hotseat)
-	OppName       string // "Bot", "Opponent", or ""
+	LocalColor    uint8
+	OppName       string
 	DisconnectMsg string
 }
 
-func Render(state *GameState, opts RenderOpts) {
+func Init(rows, cols int) {
+	if err := ttbox.Init(); err != nil {
+		fmt.Printf("initializing TUI: %v\n", err)
+		os.Exit(1)
+	}
+
+	termW, termH := ttbox.Size()
+	maxCols := termW / CellWidth
+	maxRows := termH - 6
+
+	if cols > maxCols || rows > maxRows {
+		ttbox.Close()
+		fmt.Printf("terminal size too small. Max capacity: %dx%d\n", maxRows, maxCols)
+		os.Exit(1)
+	}
+	ttbox.EnableMouse()
+}
+
+func Close() {
+	ttbox.DisableMouse()
+	ttbox.Close()
+}
+
+func Render(state *core.GameState, opts RenderOpts) {
 	ttbox.Clear()
 
 	drawStatusline(state, opts)
 	drawBoard(state)
 
-	if state.Winner != Empty {
+	if state.Winner != core.Empty {
 		drawEndgameBanner(state)
 	} else if opts.DisconnectMsg != "" {
 		drawDisconnectBanner(opts.DisconnectMsg)
@@ -54,7 +79,7 @@ func Render(state *GameState, opts RenderOpts) {
 	ttbox.Present()
 }
 
-func drawBoard(state *GameState) {
+func drawBoard(state *core.GameState) {
 	w, h := ttbox.Size()
 	offsetX := (w - (state.Cols * CellWidth)) / 2
 	offsetY := (h - state.Rows) / 2
@@ -66,15 +91,15 @@ func drawBoard(state *GameState) {
 	}
 }
 
-func drawCell(state *GameState, x, y, offsetX, offsetY int) {
+func drawCell(state *core.GameState, x, y, offsetX, offsetY int) {
 	ch := CharDot
 	fg, bg := ColorBoardGrid, ColorDefault
 	isWinPos := state.IsWinPos(x, y)
 
 	switch state.Board[y][x] {
-	case White:
+	case core.White:
 		ch, fg = CharWhite, ColorWhitePiece
-	case Black:
+	case core.Black:
 		ch, fg = CharBlack, ColorBlackPiece
 	}
 
@@ -90,13 +115,13 @@ func drawCell(state *GameState, x, y, offsetX, offsetY int) {
 	ttbox.ResetAttr()
 }
 
-func drawCursor(state *GameState, x, y, screenX, screenY int, isWinPos bool, bg int) {
+func drawCursor(state *core.GameState, x, y, screenX, screenY int, isWinPos bool, bg int) {
 	leftChar, rightChar := ' ', ' '
 	bracketFg := ColorSelValid
 
 	if x == state.SelectedX && y == state.SelectedY {
 		leftChar, rightChar = CharLeftBracket, CharRightBracket
-		if state.Board[y][x] != Empty {
+		if state.Board[y][x] != core.Empty {
 			bracketFg = ColorSelInvalid
 		}
 	}
@@ -109,7 +134,7 @@ func drawCursor(state *GameState, x, y, screenX, screenY int, isWinPos bool, bg 
 	ttbox.SetCell(screenX+1, screenY, rightChar, bracketFg, bg)
 }
 
-func drawStatusline(state *GameState, opts RenderOpts) {
+func drawStatusline(state *core.GameState, opts RenderOpts) {
 	w, h := ttbox.Size()
 	if w == 0 || h == 0 {
 		return
@@ -120,7 +145,13 @@ func drawStatusline(state *GameState, opts RenderOpts) {
 		ttbox.DrawTextCenter(1, " G O T E R M O K U ", ColorText, ColorDefault)
 	}
 
-	timerText := formatTimer(time.Since(state.StartTime))
+	drawTimer(state, w, y, opts)
+	drawTurnIndicator(state, opts, y+1)
+}
+
+func drawTimer(state *core.GameState, w, y int, opts RenderOpts) {
+	elapsed := time.Since(state.StartTime)
+	timerText := fmt.Sprintf("  %02d:%02d:%02d  ", int(elapsed.Hours()), int(elapsed.Minutes())%60, int(elapsed.Seconds())%60)
 	centerX := w / 2
 
 	whiteText, blackText := getPlayerLabels(opts)
@@ -137,30 +168,23 @@ func drawStatusline(state *GameState, opts RenderOpts) {
 	for i, ch := range blackText {
 		ttbox.SetCell(p2X+i, y, ch, blackFg, blackBg)
 	}
-
-	drawTurnIndicator(state, opts, y+1)
-}
-
-func formatTimer(elapsed time.Duration) string {
-	hours, mins, secs := int(elapsed.Hours()), int(elapsed.Minutes())%60, int(elapsed.Seconds())%60
-	return fmt.Sprintf("  %02d:%02d:%02d  ", hours, mins, secs)
 }
 
 func getPlayerLabels(opts RenderOpts) (string, string) {
 	wLabel, bLabel := " WHITE ", " BLACK "
 	if opts.OppName != "" {
-		if opts.LocalColor == White {
+		if opts.LocalColor == core.White {
 			wLabel, bLabel = " WHITE (You) ", fmt.Sprintf(" BLACK (%s) ", opts.OppName)
-		} else if opts.LocalColor == Black {
+		} else if opts.LocalColor == core.Black {
 			wLabel, bLabel = fmt.Sprintf(" WHITE (%s) ", opts.OppName), " BLACK (You) "
 		}
 	}
 	return fmt.Sprintf(" %c -%s", CharWhite, wLabel), fmt.Sprintf(" %c -%s", CharBlack, bLabel)
 }
 
-func getPlayerColors(state *GameState) (int, int, int, int) {
+func getPlayerColors(state *core.GameState) (int, int, int, int) {
 	wFg, wBg, bFg, bBg := ColorTextDim, ColorDefault, ColorTextDim, ColorDefault
-	if state.CurrentTurn == White {
+	if state.CurrentTurn == core.White {
 		wFg, wBg = ColorWhitePiece, ColorBgActive
 	} else {
 		bFg, bBg = ColorWhitePiece, ColorBgActive
@@ -168,13 +192,13 @@ func getPlayerColors(state *GameState) (int, int, int, int) {
 	return wFg, wBg, bFg, bBg
 }
 
-func drawTurnIndicator(state *GameState, opts RenderOpts, y int) {
-	if opts.OppName == "" || state.Winner != Empty {
+func drawTurnIndicator(state *core.GameState, opts RenderOpts, y int) {
+	if opts.OppName == "" || state.Winner != core.Empty {
 		return
 	}
 
 	colorStr := "WHITE"
-	if state.CurrentTurn == Black {
+	if state.CurrentTurn == core.Black {
 		colorStr = "BLACK"
 	}
 
@@ -190,13 +214,12 @@ func drawControlsGuide() {
 	ttbox.DrawTextCenter(h-1, " Move(h, j, k, l; arrows)   Place(space, enter; left-click twice)   Quit(Ctrl+C, Esc) ", ColorText, ColorDefault)
 }
 
-func drawEndgameBanner(state *GameState) {
+func drawEndgameBanner(state *core.GameState) {
 	_, h := ttbox.Size()
 	msg := " * WHITE WINS! * "
-	if state.Winner == Black {
+	if state.Winner == core.Black {
 		msg = " * BLACK WINS! * "
 	}
-
 	ttbox.SetAttr(true, false, false, false)
 	ttbox.DrawTextCenter(h-2, msg, ColorWin, ColorDefault)
 	ttbox.ResetAttr()

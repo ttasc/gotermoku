@@ -1,15 +1,13 @@
-package main
+package core
 
-var winDirections = [4][2]int{
+var WinDirections = [4][2]int{
 	{1, 0},  // Horizontal
 	{0, 1},  // Vertical
 	{1, 1},  // Main diagonal
 	{1, -1}, // Anti-diagonal
 }
 
-// scanRay scans from (x,y) in direction (dx,dy) looking for pieces of the target color.
-// Returns the number of consecutive pieces, the number of open ends (0 or 1), and positions.
-func scanRay(board [][]uint8, cols, rows, x, y, dx, dy int, color uint8) (count int, openEnd int, pos [][2]int) {
+func ScanRay(board [][]uint8, cols, rows, x, y, dx, dy int, color uint8) (count int, openEnd int, pos [][2]int) {
 	for i := 1; i <= 4; i++ {
 		nx, ny := x+(dx*i), y+(dy*i)
 		if nx < 0 || nx >= cols || ny < 0 || ny >= rows {
@@ -27,8 +25,8 @@ func scanRay(board [][]uint8, cols, rows, x, y, dx, dy int, color uint8) (count 
 	}
 	return
 }
-// canPlacePiece ensures the target cell is valid and empty.
-func canPlacePiece(state *GameState, x, y int) bool {
+
+func CanPlacePiece(state *GameState, x, y int) bool {
 	if state.Winner != Empty {
 		return false
 	}
@@ -38,11 +36,9 @@ func canPlacePiece(state *GameState, x, y int) bool {
 	return state.Board[y][x] == Empty
 }
 
-// placePiece commits a piece to the board, updates the win state, and toggles the turn.
-func placePiece(state *GameState, x, y int, color uint8) {
+func PlacePiece(state *GameState, x, y int, color uint8) {
 	state.Board[y][x] = color
 	state.MoveCount[color]++
-
 	updateWinState(state, x, y)
 
 	if state.Winner == Empty {
@@ -54,16 +50,15 @@ func placePiece(state *GameState, x, y int, color uint8) {
 	}
 }
 
-// updateWinState evaluates if the last move resulted in a win.
 func updateWinState(state *GameState, lastX, lastY int) {
 	color := state.Board[lastY][lastX]
 	if color == Empty {
 		return
 	}
 
-	for _, dir := range winDirections {
-		c1, _, p1 := scanRay(state.Board, state.Cols, state.Rows, lastX, lastY, dir[0], dir[1], color)
-		c2, _, p2 := scanRay(state.Board, state.Cols, state.Rows, lastX, lastY, -dir[0], -dir[1], color)
+	for _, dir := range WinDirections {
+		c1, _, p1 := ScanRay(state.Board, state.Cols, state.Rows, lastX, lastY, dir[0], dir[1], color)
+		c2, _, p2 := ScanRay(state.Board, state.Cols, state.Rows, lastX, lastY, -dir[0], -dir[1], color)
 
 		if c1+c2+1 >= 5 {
 			state.Winner = color

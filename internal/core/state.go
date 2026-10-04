@@ -1,4 +1,4 @@
-package main
+package core
 
 import "time"
 
@@ -8,9 +8,6 @@ const (
 	Black
 )
 
-const CellWidth = 3
-
-// GameState is the pure data model of the board. It knows nothing about UI or Network.
 type GameState struct {
 	Board            [][]uint8
 	Rows             int
