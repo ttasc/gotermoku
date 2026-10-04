@@ -10,6 +10,7 @@ const (
 
 const CellWidth = 3
 
+// GameState is the pure data model of the board. It knows nothing about UI or Network.
 type GameState struct {
 	Board            [][]uint8
 	Rows             int
@@ -21,9 +22,6 @@ type GameState struct {
 	SelectedX        int
 	SelectedY        int
 	StartTime        time.Time
-	LocalPlayerColor uint8
-	IsOnline         bool
-	IsBotMode        bool
 }
 
 func NewGameState(rows, cols int) *GameState {
@@ -42,7 +40,6 @@ func NewGameState(rows, cols int) *GameState {
 		SelectedX:        -1,
 		SelectedY:        -1,
 		StartTime:        time.Now(),
-		LocalPlayerColor: White,
 	}
 }
 

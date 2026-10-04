@@ -15,27 +15,38 @@ const (
 	CharRightBracket = ']'
 )
 
+// Colors as plain integers
 const (
-	ColorBoardGrid  = 239
-	ColorWhitePiece = 255
-	ColorBlackPiece = 245
-	ColorSelValid   = 39
-	ColorSelInvalid = 196
-	ColorWin        = 114
-	ColorText       = 250
-	ColorTextDim    = 240
-	ColorBgActive   = 236
-	ColorBgModal    = 235
+	ColorDefault    int = ttbox.ColorDefault
+	ColorBoardGrid  int = 239
+	ColorWhitePiece int = 255
+	ColorBlackPiece int = 245
+	ColorSelValid   int = 39
+	ColorSelInvalid int = 196
+	ColorWin        int = 114
+	ColorText       int = 250
+	ColorTextDim    int = 240
+	ColorBgActive   int = 236
+	ColorBgModal    int = 235
 )
 
-func Render(state *GameState) {
+// RenderOpts dictates contextual information for the view layer
+type RenderOpts struct {
+	LocalColor    uint8  // White, Black, or Empty (Hotseat)
+	OppName       string // "Bot", "Opponent", or ""
+	DisconnectMsg string
+}
+
+func Render(state *GameState, opts RenderOpts) {
 	ttbox.Clear()
 
-	drawStatusline(state)
+	drawStatusline(state, opts)
 	drawBoard(state)
 
 	if state.Winner != Empty {
 		drawEndgameBanner(state)
+	} else if opts.DisconnectMsg != "" {
+		drawDisconnectBanner(opts.DisconnectMsg)
 	} else {
 		drawControlsGuide()
 	}
@@ -56,7 +67,8 @@ func drawBoard(state *GameState) {
 }
 
 func drawCell(state *GameState, x, y, offsetX, offsetY int) {
-	ch, fg, bg := CharDot, ColorBoardGrid, ttbox.ColorDefault
+	ch := CharDot
+	fg, bg := ColorBoardGrid, ColorDefault
 	isWinPos := state.IsWinPos(x, y)
 
 	switch state.Board[y][x] {
@@ -97,7 +109,7 @@ func drawCursor(state *GameState, x, y, screenX, screenY int, isWinPos bool, bg 
 	ttbox.SetCell(screenX+1, screenY, rightChar, bracketFg, bg)
 }
 
-func drawStatusline(state *GameState) {
+func drawStatusline(state *GameState, opts RenderOpts) {
 	w, h := ttbox.Size()
 	if w == 0 || h == 0 {
 		return
@@ -105,13 +117,13 @@ func drawStatusline(state *GameState) {
 
 	y := max((h-state.Rows)/2-2, 0)
 	if y != 0 {
-		ttbox.DrawTextCenter(1, " G O T E R M O K U ", ColorText, ttbox.ColorDefault)
+		ttbox.DrawTextCenter(1, " G O T E R M O K U ", ColorText, ColorDefault)
 	}
 
 	timerText := formatTimer(time.Since(state.StartTime))
 	centerX := w / 2
 
-	whiteText, blackText := getPlayerLabels(state)
+	whiteText, blackText := getPlayerLabels(opts)
 	whiteFg, whiteBg, blackFg, blackBg := getPlayerColors(state)
 
 	p1X := centerX - (len(timerText) / 2) - len(whiteText)
@@ -119,14 +131,14 @@ func drawStatusline(state *GameState) {
 		ttbox.SetCell(p1X+i, y, ch, whiteFg, whiteBg)
 	}
 
-	ttbox.DrawTextCenter(y, timerText, ColorText, ttbox.ColorDefault)
+	ttbox.DrawTextCenter(y, timerText, ColorText, ColorDefault)
 
 	p2X := centerX + (len(timerText) / 2) + (len(timerText) % 2)
 	for i, ch := range blackText {
 		ttbox.SetCell(p2X+i, y, ch, blackFg, blackBg)
 	}
 
-	drawTurnIndicator(state, y+1)
+	drawTurnIndicator(state, opts, y+1)
 }
 
 func formatTimer(elapsed time.Duration) string {
@@ -134,22 +146,20 @@ func formatTimer(elapsed time.Duration) string {
 	return fmt.Sprintf("  %02d:%02d:%02d  ", hours, mins, secs)
 }
 
-func getPlayerLabels(state *GameState) (string, string) {
+func getPlayerLabels(opts RenderOpts) (string, string) {
 	wLabel, bLabel := " WHITE ", " BLACK "
-	if state.IsOnline {
-		if state.LocalPlayerColor == White {
-			wLabel, bLabel = " WHITE (You) ", " BLACK (Opp) "
-		} else {
-			wLabel, bLabel = " WHITE (Opp) ", " BLACK (You) "
+	if opts.OppName != "" {
+		if opts.LocalColor == White {
+			wLabel, bLabel = " WHITE (You) ", fmt.Sprintf(" BLACK (%s) ", opts.OppName)
+		} else if opts.LocalColor == Black {
+			wLabel, bLabel = fmt.Sprintf(" WHITE (%s) ", opts.OppName), " BLACK (You) "
 		}
-	} else if state.IsBotMode {
-		wLabel, bLabel = " WHITE (You) ", " BLACK (Bot) "
 	}
 	return fmt.Sprintf(" %c -%s", CharWhite, wLabel), fmt.Sprintf(" %c -%s", CharBlack, bLabel)
 }
 
 func getPlayerColors(state *GameState) (int, int, int, int) {
-	wFg, wBg, bFg, bBg := ColorTextDim, ttbox.ColorDefault, ColorTextDim, ttbox.ColorDefault
+	wFg, wBg, bFg, bBg := ColorTextDim, ColorDefault, ColorTextDim, ColorDefault
 	if state.CurrentTurn == White {
 		wFg, wBg = ColorWhitePiece, ColorBgActive
 	} else {
@@ -158,8 +168,8 @@ func getPlayerColors(state *GameState) (int, int, int, int) {
 	return wFg, wBg, bFg, bBg
 }
 
-func drawTurnIndicator(state *GameState, y int) {
-	if (!state.IsOnline && !state.IsBotMode) || state.Winner != Empty {
+func drawTurnIndicator(state *GameState, opts RenderOpts, y int) {
+	if opts.OppName == "" || state.Winner != Empty {
 		return
 	}
 
@@ -168,20 +178,16 @@ func drawTurnIndicator(state *GameState, y int) {
 		colorStr = "BLACK"
 	}
 
-	if state.CurrentTurn == state.LocalPlayerColor {
-		ttbox.DrawTextCenter(y, fmt.Sprintf(" YOUR TURN (%s) ", colorStr), ColorSelValid, ttbox.ColorDefault)
+	if state.CurrentTurn == opts.LocalColor {
+		ttbox.DrawTextCenter(y, fmt.Sprintf(" YOUR TURN (%s) ", colorStr), ColorSelValid, ColorDefault)
 	} else {
-		oppName := "OPPONENT'S"
-		if state.IsBotMode {
-			oppName = "BOT'S"
-		}
-		ttbox.DrawTextCenter(y, fmt.Sprintf(" %s TURN (%s) ", oppName, colorStr), ColorTextDim, ttbox.ColorDefault)
+		ttbox.DrawTextCenter(y, fmt.Sprintf(" %s'S TURN (%s) ", opts.OppName, colorStr), ColorTextDim, ColorDefault)
 	}
 }
 
 func drawControlsGuide() {
 	_, h := ttbox.Size()
-	ttbox.DrawTextCenter(h-1, " Move(h, j, k, l; arrows)   Place(space, enter; left-click twice)   Quit(Ctrl+C, Esc) ", ColorText, ttbox.ColorDefault)
+	ttbox.DrawTextCenter(h-1, " Move(h, j, k, l; arrows)   Place(space, enter; left-click twice)   Quit(Ctrl+C, Esc) ", ColorText, ColorDefault)
 }
 
 func drawEndgameBanner(state *GameState) {
@@ -192,7 +198,15 @@ func drawEndgameBanner(state *GameState) {
 	}
 
 	ttbox.SetAttr(true, false, false, false)
-	ttbox.DrawTextCenter(h-2, msg, ColorWin, ttbox.ColorDefault)
+	ttbox.DrawTextCenter(h-2, msg, ColorWin, ColorDefault)
 	ttbox.ResetAttr()
-	ttbox.DrawTextCenter(h-1, " [R] Play Again   [ESC] Exit ", ColorTextDim, ttbox.ColorDefault)
+	ttbox.DrawTextCenter(h-1, " [R] Play Again   [ESC] Exit ", ColorTextDim, ColorDefault)
+}
+
+func drawDisconnectBanner(msg string) {
+	_, h := ttbox.Size()
+	ttbox.SetAttr(true, false, false, false)
+	ttbox.DrawTextCenter(h-2, msg, ColorSelInvalid, ColorDefault)
+	ttbox.ResetAttr()
+	ttbox.DrawTextCenter(h-1, " [ESC] Exit ", ColorTextDim, ColorDefault)
 }

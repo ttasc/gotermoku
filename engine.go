@@ -1,183 +1,155 @@
 package main
 
 import (
-	"fmt"
-	"os"
 	"time"
-
 	"github.com/ttasc/ttbox"
 )
 
-func initUI(state *GameState) error {
-	if err := ttbox.Init(); err != nil {
-		return fmt.Errorf("initializing TUI: %w", err)
-	}
+// RunLocalLoop handles pure offline, hotseat gameplay.
+func RunLocalLoop(state *GameState) {
+	opts := RenderOpts{LocalColor: Empty, OppName: ""} // Both players play on this terminal
 
-	termW, termH := ttbox.Size()
-	maxCols := termW / CellWidth
-	maxRows := termH - 6
-
-	if state.Cols > maxCols || state.Rows > maxRows {
-		ttbox.Close()
-		return fmt.Errorf("terminal size too small. Max capacity: %dx%d", maxRows, maxCols)
+	for {
+		evt, err := ttbox.PollEventTimeout(50 * time.Millisecond)
+		if err == nil {
+			intent := HandleInput(evt, state)
+			if intent.Action == ActionQuit { break }
+			if intent.Action == ActionRestart && state.Winner != Empty {
+				state.Reset()
+			}
+			if intent.Action == ActionPlace && canPlacePiece(state, intent.X, intent.Y) {
+				placePiece(state, intent.X, intent.Y, state.CurrentTurn)
+			}
+		}
+		Render(state, opts)
 	}
-	ttbox.EnableMouse()
-	return nil
 }
 
-func RunGame(state *GameState, netMgr *NetworkManager) {
-	if err := initUI(state); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-	defer ttbox.Close()
-	defer ttbox.DisableMouse()
-
-	if state.IsOnline && netMgr != nil && netMgr.IsHost {
-		broadcastSync(state, netMgr)
-	}
-
-	var disconnectMsg string
-	defer func() {
-		if disconnectMsg != "" {
-			fmt.Printf("\n\nNOTICE: %s\n\n", disconnectMsg)
-		}
-	}()
-
-	isRunning := true
+// RunBotLoop orchestrates the local player vs AI.
+func RunBotLoop(state *GameState) {
+	opts := RenderOpts{LocalColor: White, OppName: "Bot"}
 	botMoves := make(chan [2]int, 1)
 	botThinking := false
 
-	for isRunning {
-		tickBot(state, botMoves, &botThinking)
+	for {
+		// 1. Bot Routine
+		if state.CurrentTurn == Black && state.Winner == Empty && !botThinking {
+			botThinking = true
+			go func(s *GameState) {
+				time.Sleep(400 * time.Millisecond)
+				botMoves <- getBotMove(s)
+			}(state)
+		}
 
 		select {
 		case move := <-botMoves:
 			botThinking = false
-			placePiece(state, move[0], move[1], Black)
+			if canPlacePiece(state, move[0], move[1]) {
+				placePiece(state, move[0], move[1], Black)
+			}
 		default:
 		}
 
-		if netMgr != nil {
-			if !processNetworkEvents(state, netMgr, &disconnectMsg) {
-				isRunning = false
-				continue
+		// 2. Input Routine
+		evt, err := ttbox.PollEventTimeout(50 * time.Millisecond)
+		if err == nil {
+			intent := HandleInput(evt, state)
+			if intent.Action == ActionQuit { break }
+			if intent.Action == ActionRestart && state.Winner != Empty {
+				state.Reset()
+			}
+			// Only allow local placement if it's White's turn
+			if intent.Action == ActionPlace && state.CurrentTurn == White && canPlacePiece(state, intent.X, intent.Y) {
+				placePiece(state, intent.X, intent.Y, White)
 			}
 		}
+		Render(state, opts)
+	}
+}
 
-		evt, err := ttbox.PollEventTimeout(500 * time.Millisecond)
+// RunHostLoop enforces the Server as the single source of truth.
+func RunHostLoop(state *GameState, t GameTransport) {
+	opts := RenderOpts{LocalColor: White, OppName: "Opponent"}
+	broadcastSync(state, t) // Initial sync to client
+
+	for {
+		// 1. Network Routine
+		select {
+		case msg := <-t.Receive():
+			if msg.Type == "disconnect" {
+				opts.DisconnectMsg = "Opponent disconnected."
+			} else if msg.Type == "move" && state.CurrentTurn == Black && canPlacePiece(state, msg.X, msg.Y) {
+				placePiece(state, msg.X, msg.Y, Black)
+				broadcastSync(state, t)
+			} else if msg.Type == "restart" {
+				state.Reset()
+				broadcastSync(state, t)
+			}
+		default:
+		}
+
+		// 2. Input Routine
+		evt, err := ttbox.PollEventTimeout(50 * time.Millisecond)
 		if err == nil {
-			isRunning = processInputEvent(evt, state, netMgr)
+			intent := HandleInput(evt, state)
+			if intent.Action == ActionQuit { break }
+			if intent.Action == ActionRestart && state.Winner != Empty {
+				state.Reset()
+				broadcastSync(state, t)
+			}
+			if intent.Action == ActionPlace && state.CurrentTurn == White && canPlacePiece(state, intent.X, intent.Y) {
+				placePiece(state, intent.X, intent.Y, White)
+				broadcastSync(state, t)
+			}
 		}
-
-		Render(state)
+		Render(state, opts)
 	}
 }
 
-func tickBot(state *GameState, botMoves chan<- [2]int, botThinking *bool) {
-	if state.IsBotMode && state.CurrentTurn == Black && state.Winner == Empty && !*botThinking {
-		*botThinking = true
-		go func(s *GameState) {
-			time.Sleep(400 * time.Millisecond)
-			botMoves <- getBotMove(s)
-		}(state)
+// RunClientLoop acts purely as a dumb terminal. Mutates state only via syncs.
+func RunClientLoop(state *GameState, t GameTransport) {
+	opts := RenderOpts{LocalColor: Black, OppName: "Opponent"}
+
+	for {
+		// 1. Network Routine
+		select {
+		case msg := <-t.Receive():
+			if msg.Type == "disconnect" {
+				opts.DisconnectMsg = "Host disconnected."
+			} else if msg.Type == "sync" {
+				state.Board = msg.Board
+				state.Rows = len(msg.Board)
+				if state.Rows > 0 { state.Cols = len(msg.Board[0]) }
+				state.CurrentTurn = msg.CurrentTurn
+				state.Winner = msg.Winner
+				state.WinningPositions = msg.WinningPositions
+			}
+		default:
+		}
+
+		// 2. Input Routine
+		evt, err := ttbox.PollEventTimeout(50 * time.Millisecond)
+		if err == nil {
+			intent := HandleInput(evt, state)
+			if intent.Action == ActionQuit { break }
+			if intent.Action == ActionRestart && state.Winner != Empty {
+				t.Send(NetMessage{Type: "restart"})
+			}
+			if intent.Action == ActionPlace && state.CurrentTurn == Black && canPlacePiece(state, intent.X, intent.Y) {
+				// Client does NOT apply the move. It politely requests the Host to do it.
+				t.Send(NetMessage{Type: "move", X: intent.X, Y: intent.Y})
+			}
+		}
+		Render(state, opts)
 	}
 }
 
-func processNetworkEvents(state *GameState, netMgr *NetworkManager, disconnectMsg *string) bool {
-	select {
-	case msg := <-netMgr.Incoming:
-		if msg.Type == "disconnect" {
-			*disconnectMsg = "The opponent has disconnected."
-			return false
-		}
-		handleNetworkMessage(msg, state, netMgr)
-	default:
-	}
-	return true
-}
-
-func processInputEvent(evt ttbox.Event, state *GameState, netMgr *NetworkManager) bool {
-	if evt.Type == ttbox.EventKey {
-		if evt.Key == ttbox.KeyEscape || evt.Key == ttbox.KeyCtrlC || evt.Ch == 'q' || evt.Ch == 'Q' {
-			return false
-		}
-		if state.Winner != Empty && (evt.Ch == 'r' || evt.Ch == 'R') {
-			requestRestart(state, netMgr)
-		} else if handleKeyboard(evt, state) {
-			tryLocalMove(state, netMgr, state.SelectedX, state.SelectedY)
-		}
-	} else if evt.Type == ttbox.EventMouse {
-		if x, y, action := handleMouse(evt, state); action {
-			tryLocalMove(state, netMgr, x, y)
-		}
-	}
-	return true
-}
-
-func tryLocalMove(state *GameState, netMgr *NetworkManager, x, y int) {
-	if (netMgr != nil || state.IsBotMode) && state.CurrentTurn != state.LocalPlayerColor {
-		return
-	}
-	if !canPlacePiece(state, x, y) {
-		return
-	}
-
-	if netMgr != nil && !netMgr.IsHost {
-		netMgr.Send(NetMessage{Type: "move", X: x, Y: y})
-	} else {
-		placePiece(state, x, y, state.CurrentTurn)
-		if netMgr != nil && netMgr.IsHost {
-			broadcastSync(state, netMgr)
-		}
-	}
-}
-
-func requestRestart(state *GameState, netMgr *NetworkManager) {
-	if netMgr != nil {
-		if netMgr.IsHost {
-			state.Reset()
-			broadcastSync(state, netMgr)
-		} else {
-			netMgr.Send(NetMessage{Type: "restart"})
-		}
-	} else {
-		state.Reset()
-	}
-}
-
-func broadcastSync(state *GameState, netMgr *NetworkManager) {
-	netMgr.Send(NetMessage{
+func broadcastSync(state *GameState, t GameTransport) {
+	t.Send(NetMessage{
 		Type:             "sync",
 		Board:            state.Board,
 		CurrentTurn:      state.CurrentTurn,
 		Winner:           state.Winner,
 		WinningPositions: state.WinningPositions,
 	})
-}
-
-func handleNetworkMessage(msg NetMessage, state *GameState, netMgr *NetworkManager) {
-	switch msg.Type {
-	case "move":
-		if netMgr.IsHost && state.CurrentTurn == Black && canPlacePiece(state, msg.X, msg.Y) {
-			placePiece(state, msg.X, msg.Y, Black)
-			broadcastSync(state, netMgr)
-		}
-	case "sync":
-		if !netMgr.IsHost {
-			state.Board = msg.Board
-			state.Rows = len(msg.Board)
-			if state.Rows > 0 {
-				state.Cols = len(msg.Board[0])
-			}
-			state.CurrentTurn = msg.CurrentTurn
-			state.Winner = msg.Winner
-			state.WinningPositions = msg.WinningPositions
-		}
-	case "restart":
-		if netMgr.IsHost {
-			state.Reset()
-			broadcastSync(state, netMgr)
-		}
-	}
 }
