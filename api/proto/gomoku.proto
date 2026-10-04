@@ -1,0 +1,34 @@
+// api/proto/gomoku.proto
+syntax = "proto3";
+package pb;
+option go_package = "github.com/ttasc/gotermoku/internal/netio/pb";
+
+// Host -> Client (Đồng bộ GameState)
+message GameSync {
+    string type = 1;
+    int32 current_turn = 2;
+    int32 winner = 3;
+    repeated BoardRow board = 4;
+    repeated Position winning_positions = 5;
+}
+
+message BoardRow {
+    bytes cells = 1; // bytes map 1-1 cực tốt với []uint8 trong Go
+}
+
+message Position {
+    int32 x = 1;
+    int32 y = 2;
+}
+
+// Client -> Host (Gửi hành động)
+message ClientAction {
+    string type = 1; // "move" hoặc "restart"
+    int32 x = 2;
+    int32 y = 3;
+}
+
+service GomokuService {
+    // Bi-directional Streaming RPC
+    rpc PlayStream(stream ClientAction) returns (stream GameSync);
+}
