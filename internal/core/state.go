@@ -3,7 +3,7 @@ package core
 import "time"
 
 const (
-	Empty = iota
+	Empty uint8 = iota
 	White
 	Black
 )

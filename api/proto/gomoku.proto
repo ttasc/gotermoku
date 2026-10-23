@@ -3,17 +3,12 @@ syntax = "proto3";
 package pb;
 option go_package = "github.com/ttasc/gotermoku/internal/netio/pb";
 
-// Host -> Client (Đồng bộ GameState)
-message GameSync {
-    string type = 1;
-    int32 current_turn = 2;
-    int32 winner = 3;
-    repeated BoardRow board = 4;
-    repeated Position winning_positions = 5;
-}
+// ==========================================
+// CORE GAME MODELS (Dùng chung cho LAN & Server)
+// ==========================================
 
 message BoardRow {
-    bytes cells = 1; // bytes map 1-1 cực tốt với []uint8 trong Go
+    bytes cells = 1; // bytes ánh xạ trực tiếp 1-1 với []uint8 trong Go
 }
 
 message Position {
@@ -21,14 +16,84 @@ message Position {
     int32 y = 2;
 }
 
-// Client -> Host (Gửi hành động)
+// Client -> Host / Server
 message ClientAction {
     string type = 1; // "move" hoặc "restart"
     int32 x = 2;
     int32 y = 3;
 }
 
+// Host / Server -> Client (Đồng bộ GameState)
+message GameSync {
+    string type = 1; // "sync", "disconnect", "error"
+    int32 current_turn = 2;
+    int32 winner = 3;
+    repeated BoardRow board = 4;
+    repeated Position winning_positions = 5;
+    string message = 6; // Thông báo trạng thái (nếu có)
+}
+
+// ==========================================
+// AUTHENTICATION (Xác thực tài khoản)
+// ==========================================
+
+message AuthRequest {
+    string username = 1;
+    string password = 2;
+}
+
+message AuthResponse {
+    bool success = 1;
+    string message = 2;
+    string token = 3;
+}
+
+// ==========================================
+// MATCHMAKING (Ghép trận)
+// ==========================================
+
+message QueueRequest {
+    string token = 1;
+}
+
+enum QueueStatus {
+    QUEUE_WAITING = 0;
+    QUEUE_MATCHED = 1;
+    QUEUE_CANCELLED = 2;
+    QUEUE_ERROR = 3;
+}
+
+message QueueResponse {
+    QueueStatus status = 1;
+    string message = 2;
+    string match_id = 3;
+    string opponent_name = 4;
+    int32 assigned_color = 5; // 1: White (đi trước), 2: Black (đi sau)
+    int32 rows = 6;
+    int32 cols = 7;
+}
+
+// ==========================================
+// ONLINE MATCH PLAY (Truyền nhận qua Central Server)
+// ==========================================
+
+message OnlineAction {
+    string token = 1;
+    string match_id = 2;
+    ClientAction action = 3;
+}
+
+// ==========================================
+// SERVICE UNIFIED (GomokuService duy nhất)
+// ==========================================
+
 service GomokuService {
-    // Bi-directional Streaming RPC
+    // 1. Chế độ LAN P2P hiện hữu (giữ nguyên cấu trúc)
     rpc PlayStream(stream ClientAction) returns (stream GameSync);
+
+    // 2. Chế độ Online qua Server trung tâm
+    rpc Register(AuthRequest) returns (AuthResponse);
+    rpc Login(AuthRequest) returns (AuthResponse);
+    rpc QueueMatch(QueueRequest) returns (stream QueueResponse);
+    rpc PlayOnline(stream OnlineAction) returns (stream GameSync);
 }

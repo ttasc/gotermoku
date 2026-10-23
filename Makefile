@@ -1,10 +1,27 @@
-# Makefile
-.PHONY: proto clean
+PROTO_DIR := api/proto
+PB_DIR := internal/netio/pb
 
-proto:
-	@echo "Generating gRPC code..."
-	@mkdir -p internal/netio/pb
-	protoc --go_out=internal/netio/pb --go-grpc_out=internal/netio/pb api/proto/gomoku.proto
+.PHONY: all client server proto clean
+
+all: client server
+
+client:
+	@echo "Building gotermoku client..."
+	go build -o gotermoku ./cmd/gotermoku
+
+server:
+	@echo "Building gotermoku-server..."
+	go build -o gotermoku-server ./cmd/gotermoku-server
 
 clean:
-	@rm -rf internal/netio/pb
+	@echo "Cleaning up binaries..."
+	@rm -f gotermoku gotermoku-server
+
+proto:
+	mkdir -p $(PB_DIR)
+	protoc \
+		--go_out=. \
+		--go_opt=module=github.com/ttasc/gotermoku \
+		--go-grpc_out=. \
+		--go-grpc_opt=module=github.com/ttasc/gotermoku \
+		$(PROTO_DIR)/gomoku.proto

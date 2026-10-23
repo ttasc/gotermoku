@@ -22,14 +22,23 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	GomokuService_PlayStream_FullMethodName = "/pb.GomokuService/PlayStream"
+	GomokuService_Register_FullMethodName   = "/pb.GomokuService/Register"
+	GomokuService_Login_FullMethodName      = "/pb.GomokuService/Login"
+	GomokuService_QueueMatch_FullMethodName = "/pb.GomokuService/QueueMatch"
+	GomokuService_PlayOnline_FullMethodName = "/pb.GomokuService/PlayOnline"
 )
 
 // GomokuServiceClient is the client API for GomokuService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type GomokuServiceClient interface {
-	// Bi-directional Streaming RPC
+	// 1. Chế độ LAN P2P hiện hữu (giữ nguyên cấu trúc)
 	PlayStream(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ClientAction, GameSync], error)
+	// 2. Chế độ Online qua Server trung tâm
+	Register(ctx context.Context, in *AuthRequest, opts ...grpc.CallOption) (*AuthResponse, error)
+	Login(ctx context.Context, in *AuthRequest, opts ...grpc.CallOption) (*AuthResponse, error)
+	QueueMatch(ctx context.Context, in *QueueRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[QueueResponse], error)
+	PlayOnline(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[OnlineAction, GameSync], error)
 }
 
 type gomokuServiceClient struct {
@@ -53,12 +62,69 @@ func (c *gomokuServiceClient) PlayStream(ctx context.Context, opts ...grpc.CallO
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type GomokuService_PlayStreamClient = grpc.BidiStreamingClient[ClientAction, GameSync]
 
+func (c *gomokuServiceClient) Register(ctx context.Context, in *AuthRequest, opts ...grpc.CallOption) (*AuthResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AuthResponse)
+	err := c.cc.Invoke(ctx, GomokuService_Register_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gomokuServiceClient) Login(ctx context.Context, in *AuthRequest, opts ...grpc.CallOption) (*AuthResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AuthResponse)
+	err := c.cc.Invoke(ctx, GomokuService_Login_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gomokuServiceClient) QueueMatch(ctx context.Context, in *QueueRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[QueueResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &GomokuService_ServiceDesc.Streams[1], GomokuService_QueueMatch_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[QueueRequest, QueueResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type GomokuService_QueueMatchClient = grpc.ServerStreamingClient[QueueResponse]
+
+func (c *gomokuServiceClient) PlayOnline(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[OnlineAction, GameSync], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &GomokuService_ServiceDesc.Streams[2], GomokuService_PlayOnline_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[OnlineAction, GameSync]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type GomokuService_PlayOnlineClient = grpc.BidiStreamingClient[OnlineAction, GameSync]
+
 // GomokuServiceServer is the server API for GomokuService service.
 // All implementations must embed UnimplementedGomokuServiceServer
 // for forward compatibility.
 type GomokuServiceServer interface {
-	// Bi-directional Streaming RPC
+	// 1. Chế độ LAN P2P hiện hữu (giữ nguyên cấu trúc)
 	PlayStream(grpc.BidiStreamingServer[ClientAction, GameSync]) error
+	// 2. Chế độ Online qua Server trung tâm
+	Register(context.Context, *AuthRequest) (*AuthResponse, error)
+	Login(context.Context, *AuthRequest) (*AuthResponse, error)
+	QueueMatch(*QueueRequest, grpc.ServerStreamingServer[QueueResponse]) error
+	PlayOnline(grpc.BidiStreamingServer[OnlineAction, GameSync]) error
 	mustEmbedUnimplementedGomokuServiceServer()
 }
 
@@ -71,6 +137,18 @@ type UnimplementedGomokuServiceServer struct{}
 
 func (UnimplementedGomokuServiceServer) PlayStream(grpc.BidiStreamingServer[ClientAction, GameSync]) error {
 	return status.Error(codes.Unimplemented, "method PlayStream not implemented")
+}
+func (UnimplementedGomokuServiceServer) Register(context.Context, *AuthRequest) (*AuthResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Register not implemented")
+}
+func (UnimplementedGomokuServiceServer) Login(context.Context, *AuthRequest) (*AuthResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Login not implemented")
+}
+func (UnimplementedGomokuServiceServer) QueueMatch(*QueueRequest, grpc.ServerStreamingServer[QueueResponse]) error {
+	return status.Error(codes.Unimplemented, "method QueueMatch not implemented")
+}
+func (UnimplementedGomokuServiceServer) PlayOnline(grpc.BidiStreamingServer[OnlineAction, GameSync]) error {
+	return status.Error(codes.Unimplemented, "method PlayOnline not implemented")
 }
 func (UnimplementedGomokuServiceServer) mustEmbedUnimplementedGomokuServiceServer() {}
 func (UnimplementedGomokuServiceServer) testEmbeddedByValue()                       {}
@@ -100,17 +178,91 @@ func _GomokuService_PlayStream_Handler(srv interface{}, stream grpc.ServerStream
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type GomokuService_PlayStreamServer = grpc.BidiStreamingServer[ClientAction, GameSync]
 
+func _GomokuService_Register_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AuthRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GomokuServiceServer).Register(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GomokuService_Register_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GomokuServiceServer).Register(ctx, req.(*AuthRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GomokuService_Login_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AuthRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GomokuServiceServer).Login(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GomokuService_Login_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GomokuServiceServer).Login(ctx, req.(*AuthRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GomokuService_QueueMatch_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(QueueRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(GomokuServiceServer).QueueMatch(m, &grpc.GenericServerStream[QueueRequest, QueueResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type GomokuService_QueueMatchServer = grpc.ServerStreamingServer[QueueResponse]
+
+func _GomokuService_PlayOnline_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(GomokuServiceServer).PlayOnline(&grpc.GenericServerStream[OnlineAction, GameSync]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type GomokuService_PlayOnlineServer = grpc.BidiStreamingServer[OnlineAction, GameSync]
+
 // GomokuService_ServiceDesc is the grpc.ServiceDesc for GomokuService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var GomokuService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "pb.GomokuService",
 	HandlerType: (*GomokuServiceServer)(nil),
-	Methods:     []grpc.MethodDesc{},
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "Register",
+			Handler:    _GomokuService_Register_Handler,
+		},
+		{
+			MethodName: "Login",
+			Handler:    _GomokuService_Login_Handler,
+		},
+	},
 	Streams: []grpc.StreamDesc{
 		{
 			StreamName:    "PlayStream",
 			Handler:       _GomokuService_PlayStream_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
+		},
+		{
+			StreamName:    "QueueMatch",
+			Handler:       _GomokuService_QueueMatch_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "PlayOnline",
+			Handler:       _GomokuService_PlayOnline_Handler,
 			ServerStreams: true,
 			ClientStreams: true,
 		},

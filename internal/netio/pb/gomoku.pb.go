@@ -23,21 +23,231 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// Host -> Client (Đồng bộ GameState)
+type QueueStatus int32
+
+const (
+	QueueStatus_QUEUE_WAITING   QueueStatus = 0
+	QueueStatus_QUEUE_MATCHED   QueueStatus = 1
+	QueueStatus_QUEUE_CANCELLED QueueStatus = 2
+	QueueStatus_QUEUE_ERROR     QueueStatus = 3
+)
+
+// Enum value maps for QueueStatus.
+var (
+	QueueStatus_name = map[int32]string{
+		0: "QUEUE_WAITING",
+		1: "QUEUE_MATCHED",
+		2: "QUEUE_CANCELLED",
+		3: "QUEUE_ERROR",
+	}
+	QueueStatus_value = map[string]int32{
+		"QUEUE_WAITING":   0,
+		"QUEUE_MATCHED":   1,
+		"QUEUE_CANCELLED": 2,
+		"QUEUE_ERROR":     3,
+	}
+)
+
+func (x QueueStatus) Enum() *QueueStatus {
+	p := new(QueueStatus)
+	*p = x
+	return p
+}
+
+func (x QueueStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (QueueStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_api_proto_gomoku_proto_enumTypes[0].Descriptor()
+}
+
+func (QueueStatus) Type() protoreflect.EnumType {
+	return &file_api_proto_gomoku_proto_enumTypes[0]
+}
+
+func (x QueueStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use QueueStatus.Descriptor instead.
+func (QueueStatus) EnumDescriptor() ([]byte, []int) {
+	return file_api_proto_gomoku_proto_rawDescGZIP(), []int{0}
+}
+
+type BoardRow struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Cells         []byte                 `protobuf:"bytes,1,opt,name=cells,proto3" json:"cells,omitempty"` // bytes ánh xạ trực tiếp 1-1 với []uint8 trong Go
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BoardRow) Reset() {
+	*x = BoardRow{}
+	mi := &file_api_proto_gomoku_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BoardRow) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BoardRow) ProtoMessage() {}
+
+func (x *BoardRow) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_gomoku_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BoardRow.ProtoReflect.Descriptor instead.
+func (*BoardRow) Descriptor() ([]byte, []int) {
+	return file_api_proto_gomoku_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *BoardRow) GetCells() []byte {
+	if x != nil {
+		return x.Cells
+	}
+	return nil
+}
+
+type Position struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	X             int32                  `protobuf:"varint,1,opt,name=x,proto3" json:"x,omitempty"`
+	Y             int32                  `protobuf:"varint,2,opt,name=y,proto3" json:"y,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Position) Reset() {
+	*x = Position{}
+	mi := &file_api_proto_gomoku_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Position) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Position) ProtoMessage() {}
+
+func (x *Position) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_gomoku_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Position.ProtoReflect.Descriptor instead.
+func (*Position) Descriptor() ([]byte, []int) {
+	return file_api_proto_gomoku_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *Position) GetX() int32 {
+	if x != nil {
+		return x.X
+	}
+	return 0
+}
+
+func (x *Position) GetY() int32 {
+	if x != nil {
+		return x.Y
+	}
+	return 0
+}
+
+// Client -> Host / Server
+type ClientAction struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Type          string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"` // "move" hoặc "restart"
+	X             int32                  `protobuf:"varint,2,opt,name=x,proto3" json:"x,omitempty"`
+	Y             int32                  `protobuf:"varint,3,opt,name=y,proto3" json:"y,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ClientAction) Reset() {
+	*x = ClientAction{}
+	mi := &file_api_proto_gomoku_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ClientAction) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ClientAction) ProtoMessage() {}
+
+func (x *ClientAction) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_gomoku_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ClientAction.ProtoReflect.Descriptor instead.
+func (*ClientAction) Descriptor() ([]byte, []int) {
+	return file_api_proto_gomoku_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *ClientAction) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *ClientAction) GetX() int32 {
+	if x != nil {
+		return x.X
+	}
+	return 0
+}
+
+func (x *ClientAction) GetY() int32 {
+	if x != nil {
+		return x.Y
+	}
+	return 0
+}
+
+// Host / Server -> Client (Đồng bộ GameState)
 type GameSync struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
-	Type             string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
+	Type             string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"` // "sync", "disconnect", "error"
 	CurrentTurn      int32                  `protobuf:"varint,2,opt,name=current_turn,json=currentTurn,proto3" json:"current_turn,omitempty"`
 	Winner           int32                  `protobuf:"varint,3,opt,name=winner,proto3" json:"winner,omitempty"`
 	Board            []*BoardRow            `protobuf:"bytes,4,rep,name=board,proto3" json:"board,omitempty"`
 	WinningPositions []*Position            `protobuf:"bytes,5,rep,name=winning_positions,json=winningPositions,proto3" json:"winning_positions,omitempty"`
+	Message          string                 `protobuf:"bytes,6,opt,name=message,proto3" json:"message,omitempty"` // Thông báo trạng thái (nếu có)
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
 
 func (x *GameSync) Reset() {
 	*x = GameSync{}
-	mi := &file_api_proto_gomoku_proto_msgTypes[0]
+	mi := &file_api_proto_gomoku_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -49,7 +259,7 @@ func (x *GameSync) String() string {
 func (*GameSync) ProtoMessage() {}
 
 func (x *GameSync) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_gomoku_proto_msgTypes[0]
+	mi := &file_api_proto_gomoku_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -62,7 +272,7 @@ func (x *GameSync) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GameSync.ProtoReflect.Descriptor instead.
 func (*GameSync) Descriptor() ([]byte, []int) {
-	return file_api_proto_gomoku_proto_rawDescGZIP(), []int{0}
+	return file_api_proto_gomoku_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *GameSync) GetType() string {
@@ -100,174 +310,326 @@ func (x *GameSync) GetWinningPositions() []*Position {
 	return nil
 }
 
-type BoardRow struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Cells         []byte                 `protobuf:"bytes,1,opt,name=cells,proto3" json:"cells,omitempty"` // bytes map 1-1 cực tốt với []uint8 trong Go
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *BoardRow) Reset() {
-	*x = BoardRow{}
-	mi := &file_api_proto_gomoku_proto_msgTypes[1]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *BoardRow) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*BoardRow) ProtoMessage() {}
-
-func (x *BoardRow) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_gomoku_proto_msgTypes[1]
+func (x *GameSync) GetMessage() string {
 	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use BoardRow.ProtoReflect.Descriptor instead.
-func (*BoardRow) Descriptor() ([]byte, []int) {
-	return file_api_proto_gomoku_proto_rawDescGZIP(), []int{1}
-}
-
-func (x *BoardRow) GetCells() []byte {
-	if x != nil {
-		return x.Cells
-	}
-	return nil
-}
-
-type Position struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	X             int32                  `protobuf:"varint,1,opt,name=x,proto3" json:"x,omitempty"`
-	Y             int32                  `protobuf:"varint,2,opt,name=y,proto3" json:"y,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *Position) Reset() {
-	*x = Position{}
-	mi := &file_api_proto_gomoku_proto_msgTypes[2]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *Position) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Position) ProtoMessage() {}
-
-func (x *Position) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_gomoku_proto_msgTypes[2]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Position.ProtoReflect.Descriptor instead.
-func (*Position) Descriptor() ([]byte, []int) {
-	return file_api_proto_gomoku_proto_rawDescGZIP(), []int{2}
-}
-
-func (x *Position) GetX() int32 {
-	if x != nil {
-		return x.X
-	}
-	return 0
-}
-
-func (x *Position) GetY() int32 {
-	if x != nil {
-		return x.Y
-	}
-	return 0
-}
-
-// Client -> Host (Gửi hành động)
-type ClientAction struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Type          string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"` // "move" hoặc "restart"
-	X             int32                  `protobuf:"varint,2,opt,name=x,proto3" json:"x,omitempty"`
-	Y             int32                  `protobuf:"varint,3,opt,name=y,proto3" json:"y,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ClientAction) Reset() {
-	*x = ClientAction{}
-	mi := &file_api_proto_gomoku_proto_msgTypes[3]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ClientAction) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ClientAction) ProtoMessage() {}
-
-func (x *ClientAction) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_gomoku_proto_msgTypes[3]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ClientAction.ProtoReflect.Descriptor instead.
-func (*ClientAction) Descriptor() ([]byte, []int) {
-	return file_api_proto_gomoku_proto_rawDescGZIP(), []int{3}
-}
-
-func (x *ClientAction) GetType() string {
-	if x != nil {
-		return x.Type
+		return x.Message
 	}
 	return ""
 }
 
-func (x *ClientAction) GetX() int32 {
+type AuthRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Username      string                 `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`
+	Password      string                 `protobuf:"bytes,2,opt,name=password,proto3" json:"password,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AuthRequest) Reset() {
+	*x = AuthRequest{}
+	mi := &file_api_proto_gomoku_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AuthRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AuthRequest) ProtoMessage() {}
+
+func (x *AuthRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_gomoku_proto_msgTypes[4]
 	if x != nil {
-		return x.X
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AuthRequest.ProtoReflect.Descriptor instead.
+func (*AuthRequest) Descriptor() ([]byte, []int) {
+	return file_api_proto_gomoku_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *AuthRequest) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
+func (x *AuthRequest) GetPassword() string {
+	if x != nil {
+		return x.Password
+	}
+	return ""
+}
+
+type AuthResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	Token         string                 `protobuf:"bytes,3,opt,name=token,proto3" json:"token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AuthResponse) Reset() {
+	*x = AuthResponse{}
+	mi := &file_api_proto_gomoku_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AuthResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AuthResponse) ProtoMessage() {}
+
+func (x *AuthResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_gomoku_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AuthResponse.ProtoReflect.Descriptor instead.
+func (*AuthResponse) Descriptor() ([]byte, []int) {
+	return file_api_proto_gomoku_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *AuthResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *AuthResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *AuthResponse) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
+type QueueRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Token         string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *QueueRequest) Reset() {
+	*x = QueueRequest{}
+	mi := &file_api_proto_gomoku_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *QueueRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*QueueRequest) ProtoMessage() {}
+
+func (x *QueueRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_gomoku_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use QueueRequest.ProtoReflect.Descriptor instead.
+func (*QueueRequest) Descriptor() ([]byte, []int) {
+	return file_api_proto_gomoku_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *QueueRequest) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
+type QueueResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Status        QueueStatus            `protobuf:"varint,1,opt,name=status,proto3,enum=pb.QueueStatus" json:"status,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	MatchId       string                 `protobuf:"bytes,3,opt,name=match_id,json=matchId,proto3" json:"match_id,omitempty"`
+	OpponentName  string                 `protobuf:"bytes,4,opt,name=opponent_name,json=opponentName,proto3" json:"opponent_name,omitempty"`
+	AssignedColor int32                  `protobuf:"varint,5,opt,name=assigned_color,json=assignedColor,proto3" json:"assigned_color,omitempty"` // 1: White (đi trước), 2: Black (đi sau)
+	Rows          int32                  `protobuf:"varint,6,opt,name=rows,proto3" json:"rows,omitempty"`
+	Cols          int32                  `protobuf:"varint,7,opt,name=cols,proto3" json:"cols,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *QueueResponse) Reset() {
+	*x = QueueResponse{}
+	mi := &file_api_proto_gomoku_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *QueueResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*QueueResponse) ProtoMessage() {}
+
+func (x *QueueResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_gomoku_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use QueueResponse.ProtoReflect.Descriptor instead.
+func (*QueueResponse) Descriptor() ([]byte, []int) {
+	return file_api_proto_gomoku_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *QueueResponse) GetStatus() QueueStatus {
+	if x != nil {
+		return x.Status
+	}
+	return QueueStatus_QUEUE_WAITING
+}
+
+func (x *QueueResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *QueueResponse) GetMatchId() string {
+	if x != nil {
+		return x.MatchId
+	}
+	return ""
+}
+
+func (x *QueueResponse) GetOpponentName() string {
+	if x != nil {
+		return x.OpponentName
+	}
+	return ""
+}
+
+func (x *QueueResponse) GetAssignedColor() int32 {
+	if x != nil {
+		return x.AssignedColor
 	}
 	return 0
 }
 
-func (x *ClientAction) GetY() int32 {
+func (x *QueueResponse) GetRows() int32 {
 	if x != nil {
-		return x.Y
+		return x.Rows
 	}
 	return 0
+}
+
+func (x *QueueResponse) GetCols() int32 {
+	if x != nil {
+		return x.Cols
+	}
+	return 0
+}
+
+type OnlineAction struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Token         string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
+	MatchId       string                 `protobuf:"bytes,2,opt,name=match_id,json=matchId,proto3" json:"match_id,omitempty"`
+	Action        *ClientAction          `protobuf:"bytes,3,opt,name=action,proto3" json:"action,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OnlineAction) Reset() {
+	*x = OnlineAction{}
+	mi := &file_api_proto_gomoku_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OnlineAction) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OnlineAction) ProtoMessage() {}
+
+func (x *OnlineAction) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_gomoku_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OnlineAction.ProtoReflect.Descriptor instead.
+func (*OnlineAction) Descriptor() ([]byte, []int) {
+	return file_api_proto_gomoku_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *OnlineAction) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
+func (x *OnlineAction) GetMatchId() string {
+	if x != nil {
+		return x.MatchId
+	}
+	return ""
+}
+
+func (x *OnlineAction) GetAction() *ClientAction {
+	if x != nil {
+		return x.Action
+	}
+	return nil
 }
 
 var File_api_proto_gomoku_proto protoreflect.FileDescriptor
 
 const file_api_proto_gomoku_proto_rawDesc = "" +
 	"\n" +
-	"\x16api/proto/gomoku.proto\x12\x02pb\"\xb8\x01\n" +
-	"\bGameSync\x12\x12\n" +
-	"\x04type\x18\x01 \x01(\tR\x04type\x12!\n" +
-	"\fcurrent_turn\x18\x02 \x01(\x05R\vcurrentTurn\x12\x16\n" +
-	"\x06winner\x18\x03 \x01(\x05R\x06winner\x12\"\n" +
-	"\x05board\x18\x04 \x03(\v2\f.pb.BoardRowR\x05board\x129\n" +
-	"\x11winning_positions\x18\x05 \x03(\v2\f.pb.PositionR\x10winningPositions\" \n" +
+	"\x16api/proto/gomoku.proto\x12\x02pb\" \n" +
 	"\bBoardRow\x12\x14\n" +
 	"\x05cells\x18\x01 \x01(\fR\x05cells\"&\n" +
 	"\bPosition\x12\f\n" +
@@ -276,10 +638,49 @@ const file_api_proto_gomoku_proto_rawDesc = "" +
 	"\fClientAction\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12\f\n" +
 	"\x01x\x18\x02 \x01(\x05R\x01x\x12\f\n" +
-	"\x01y\x18\x03 \x01(\x05R\x01y2A\n" +
+	"\x01y\x18\x03 \x01(\x05R\x01y\"\xd2\x01\n" +
+	"\bGameSync\x12\x12\n" +
+	"\x04type\x18\x01 \x01(\tR\x04type\x12!\n" +
+	"\fcurrent_turn\x18\x02 \x01(\x05R\vcurrentTurn\x12\x16\n" +
+	"\x06winner\x18\x03 \x01(\x05R\x06winner\x12\"\n" +
+	"\x05board\x18\x04 \x03(\v2\f.pb.BoardRowR\x05board\x129\n" +
+	"\x11winning_positions\x18\x05 \x03(\v2\f.pb.PositionR\x10winningPositions\x12\x18\n" +
+	"\amessage\x18\x06 \x01(\tR\amessage\"E\n" +
+	"\vAuthRequest\x12\x1a\n" +
+	"\busername\x18\x01 \x01(\tR\busername\x12\x1a\n" +
+	"\bpassword\x18\x02 \x01(\tR\bpassword\"X\n" +
+	"\fAuthResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12\x14\n" +
+	"\x05token\x18\x03 \x01(\tR\x05token\"$\n" +
+	"\fQueueRequest\x12\x14\n" +
+	"\x05token\x18\x01 \x01(\tR\x05token\"\xe1\x01\n" +
+	"\rQueueResponse\x12'\n" +
+	"\x06status\x18\x01 \x01(\x0e2\x0f.pb.QueueStatusR\x06status\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12\x19\n" +
+	"\bmatch_id\x18\x03 \x01(\tR\amatchId\x12#\n" +
+	"\ropponent_name\x18\x04 \x01(\tR\fopponentName\x12%\n" +
+	"\x0eassigned_color\x18\x05 \x01(\x05R\rassignedColor\x12\x12\n" +
+	"\x04rows\x18\x06 \x01(\x05R\x04rows\x12\x12\n" +
+	"\x04cols\x18\a \x01(\x05R\x04cols\"i\n" +
+	"\fOnlineAction\x12\x14\n" +
+	"\x05token\x18\x01 \x01(\tR\x05token\x12\x19\n" +
+	"\bmatch_id\x18\x02 \x01(\tR\amatchId\x12(\n" +
+	"\x06action\x18\x03 \x01(\v2\x10.pb.ClientActionR\x06action*Y\n" +
+	"\vQueueStatus\x12\x11\n" +
+	"\rQUEUE_WAITING\x10\x00\x12\x11\n" +
+	"\rQUEUE_MATCHED\x10\x01\x12\x13\n" +
+	"\x0fQUEUE_CANCELLED\x10\x02\x12\x0f\n" +
+	"\vQUEUE_ERROR\x10\x032\x83\x02\n" +
 	"\rGomokuService\x120\n" +
 	"\n" +
-	"PlayStream\x12\x10.pb.ClientAction\x1a\f.pb.GameSync(\x010\x01B.Z,github.com/ttasc/gotermoku/internal/netio/pbb\x06proto3"
+	"PlayStream\x12\x10.pb.ClientAction\x1a\f.pb.GameSync(\x010\x01\x12-\n" +
+	"\bRegister\x12\x0f.pb.AuthRequest\x1a\x10.pb.AuthResponse\x12*\n" +
+	"\x05Login\x12\x0f.pb.AuthRequest\x1a\x10.pb.AuthResponse\x123\n" +
+	"\n" +
+	"QueueMatch\x12\x10.pb.QueueRequest\x1a\x11.pb.QueueResponse0\x01\x120\n" +
+	"\n" +
+	"PlayOnline\x12\x10.pb.OnlineAction\x1a\f.pb.GameSync(\x010\x01B.Z,github.com/ttasc/gotermoku/internal/netio/pbb\x06proto3"
 
 var (
 	file_api_proto_gomoku_proto_rawDescOnce sync.Once
@@ -293,23 +694,40 @@ func file_api_proto_gomoku_proto_rawDescGZIP() []byte {
 	return file_api_proto_gomoku_proto_rawDescData
 }
 
-var file_api_proto_gomoku_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_api_proto_gomoku_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_api_proto_gomoku_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_api_proto_gomoku_proto_goTypes = []any{
-	(*GameSync)(nil),     // 0: pb.GameSync
-	(*BoardRow)(nil),     // 1: pb.BoardRow
-	(*Position)(nil),     // 2: pb.Position
-	(*ClientAction)(nil), // 3: pb.ClientAction
+	(QueueStatus)(0),      // 0: pb.QueueStatus
+	(*BoardRow)(nil),      // 1: pb.BoardRow
+	(*Position)(nil),      // 2: pb.Position
+	(*ClientAction)(nil),  // 3: pb.ClientAction
+	(*GameSync)(nil),      // 4: pb.GameSync
+	(*AuthRequest)(nil),   // 5: pb.AuthRequest
+	(*AuthResponse)(nil),  // 6: pb.AuthResponse
+	(*QueueRequest)(nil),  // 7: pb.QueueRequest
+	(*QueueResponse)(nil), // 8: pb.QueueResponse
+	(*OnlineAction)(nil),  // 9: pb.OnlineAction
 }
 var file_api_proto_gomoku_proto_depIdxs = []int32{
 	1, // 0: pb.GameSync.board:type_name -> pb.BoardRow
 	2, // 1: pb.GameSync.winning_positions:type_name -> pb.Position
-	3, // 2: pb.GomokuService.PlayStream:input_type -> pb.ClientAction
-	0, // 3: pb.GomokuService.PlayStream:output_type -> pb.GameSync
-	3, // [3:4] is the sub-list for method output_type
-	2, // [2:3] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	0, // 2: pb.QueueResponse.status:type_name -> pb.QueueStatus
+	3, // 3: pb.OnlineAction.action:type_name -> pb.ClientAction
+	3, // 4: pb.GomokuService.PlayStream:input_type -> pb.ClientAction
+	5, // 5: pb.GomokuService.Register:input_type -> pb.AuthRequest
+	5, // 6: pb.GomokuService.Login:input_type -> pb.AuthRequest
+	7, // 7: pb.GomokuService.QueueMatch:input_type -> pb.QueueRequest
+	9, // 8: pb.GomokuService.PlayOnline:input_type -> pb.OnlineAction
+	4, // 9: pb.GomokuService.PlayStream:output_type -> pb.GameSync
+	6, // 10: pb.GomokuService.Register:output_type -> pb.AuthResponse
+	6, // 11: pb.GomokuService.Login:output_type -> pb.AuthResponse
+	8, // 12: pb.GomokuService.QueueMatch:output_type -> pb.QueueResponse
+	4, // 13: pb.GomokuService.PlayOnline:output_type -> pb.GameSync
+	9, // [9:14] is the sub-list for method output_type
+	4, // [4:9] is the sub-list for method input_type
+	4, // [4:4] is the sub-list for extension type_name
+	4, // [4:4] is the sub-list for extension extendee
+	0, // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_api_proto_gomoku_proto_init() }
@@ -322,13 +740,14 @@ func file_api_proto_gomoku_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_proto_gomoku_proto_rawDesc), len(file_api_proto_gomoku_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   4,
+			NumEnums:      1,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_api_proto_gomoku_proto_goTypes,
 		DependencyIndexes: file_api_proto_gomoku_proto_depIdxs,
+		EnumInfos:         file_api_proto_gomoku_proto_enumTypes,
 		MessageInfos:      file_api_proto_gomoku_proto_msgTypes,
 	}.Build()
 	File_api_proto_gomoku_proto = out.File

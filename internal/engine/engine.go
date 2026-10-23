@@ -11,7 +11,7 @@ import (
 	"github.com/ttasc/ttbox"
 )
 
-// Run unifies Hotseat, Bot, Host, and Client loops into a single orchestration layer.
+// Run unifies Hotseat, Bot, Host, Client, and Central Online loops into a single orchestration layer.
 func Run(cfg *config.Config, state *core.GameState, t netio.Transport) {
 	opts := buildRenderOpts(cfg)
 
@@ -63,11 +63,18 @@ func buildRenderOpts(cfg *config.Config) ui.RenderOpts {
 		opts.LocalColor = core.White
 		opts.OppName = "Bot"
 	} else if cfg.IsOnline {
-		opts.OppName = "Opponent"
-		if cfg.IsHost {
-			opts.LocalColor = core.White
+		// Nhánh Central Server: Dùng màu quân và tên đối thủ được server gán
+		if cfg.IsCentralMode {
+			opts.LocalColor = cfg.AssignedColor
+			opts.OppName = cfg.OpponentName
 		} else {
-			opts.LocalColor = core.Black
+			// Nhánh LAN P2P truyền thống
+			opts.OppName = "Opponent"
+			if cfg.IsHost {
+				opts.LocalColor = core.White
+			} else {
+				opts.LocalColor = core.Black
+			}
 		}
 	}
 	return opts
@@ -77,7 +84,9 @@ func processNetwork(cfg *config.Config, state *core.GameState, t netio.Transport
 	select {
 	case msg := <-t.Receive():
 		if msg.Type == "disconnect" {
-			if cfg.IsHost {
+			if cfg.IsCentralMode {
+				opts.DisconnectMsg = "Opponent disconnected from server."
+			} else if cfg.IsHost {
 				opts.DisconnectMsg = "Opponent disconnected."
 			} else {
 				opts.DisconnectMsg = "Host disconnected."
@@ -119,7 +128,15 @@ func processIntent(cfg *config.Config, intent ui.InputIntent, state *core.GameSt
 
 	if intent.Action == ui.ActionPlace {
 		if cfg.IsOnline && !cfg.IsHost {
-			if state.CurrentTurn == core.Black && core.CanPlacePiece(state, intent.X, intent.Y) {
+			// Mặc định LAN Client là quân Đen
+			allowedTurn := core.Black
+
+			// Với Central Server: Cho phép đi nếu lượt hiện tại trùng với màu cờ được gán (Trắng hoặc Đen)
+			if cfg.IsCentralMode {
+				allowedTurn = cfg.AssignedColor
+			}
+
+			if state.CurrentTurn == allowedTurn && core.CanPlacePiece(state, intent.X, intent.Y) {
 				t.Send(netio.NetMessage{Type: "move", X: intent.X, Y: intent.Y})
 			}
 			return

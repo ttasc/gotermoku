@@ -9,13 +9,21 @@ import (
 )
 
 type Config struct {
-	Rows      int
-	Cols      int
-	IsBotMode bool
-	IsOnline  bool
-	IsHost    bool
-	JoinAddr  string
-	Port      string
+	Rows          int
+	Cols          int
+	IsBotMode     bool
+	IsOnline      bool
+	IsHost        bool
+	JoinAddr      string
+	Port          string
+	// Các trường phục vụ Central Server Online
+	ServerAddr    string
+	Username      string
+	Password      string
+	IsRegister    bool
+	IsCentralMode bool
+	AssignedColor uint8
+	OpponentName  string
 }
 
 func parseDimensions(sizeStr string) (int, int, error) {
@@ -44,6 +52,12 @@ func Parse(args []string) *Config {
 	sizeStr := fs.String("size", "20x30", "")
 	sizeShorthand := fs.String("s", "20x30", "")
 
+	// Cờ mới cho Central Server
+	serverAddr := fs.String("server", "", "")
+	username := fs.String("user", "", "")
+	password := fs.String("pass", "", "")
+	registerFlag := fs.Bool("register", false, "")
+
 	if err := fs.Parse(args); err != nil {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
@@ -52,6 +66,13 @@ func Parse(args []string) *Config {
 	if *helpFlag || *hFlag {
 		printUsage()
 		os.Exit(0)
+	}
+
+	// Kiểm tra loại trừ xung đột các chế độ chơi
+	isCentral := *serverAddr != ""
+	if isCentral && (*botFlag || *hostFlag || *joinAddr != "") {
+		fmt.Println("Error: cannot combine --server with --bot, --host, or --join")
+		os.Exit(1)
 	}
 	if *botFlag && (*hostFlag || *joinAddr != "") {
 		fmt.Println("Error: cannot use --bot with online modes")
@@ -74,22 +95,32 @@ func Parse(args []string) *Config {
 	}
 
 	return &Config{
-		Rows:      rows,
-		Cols:      cols,
-		IsOnline:  *hostFlag || *joinAddr != "",
-		IsHost:    *hostFlag,
-		IsBotMode: *botFlag,
-		JoinAddr:  *joinAddr,
-		Port:      *port,
+		Rows:          rows,
+		Cols:          cols,
+		IsOnline:      *hostFlag || *joinAddr != "" || isCentral,
+		IsHost:        *hostFlag,
+		IsBotMode:     *botFlag,
+		JoinAddr:      *joinAddr,
+		Port:          *port,
+		ServerAddr:    *serverAddr,
+		Username:      *username,
+		Password:      *password,
+		IsRegister:    *registerFlag,
+		IsCentralMode: isCentral,
 	}
 }
 
 func printUsage() {
 	fmt.Println("Gomoku TUI Game\nUsage:\n  gotermoku [options]\nOptions:")
-	fmt.Println("  -h, --help       Show this help message")
-	fmt.Println("  -s, --size       Specify board size as ROWSxCOLS (default: 20x30, min: 3x3)")
-	fmt.Println("  --bot            Play against AI in offline mode")
-	fmt.Println("  --host           Enable online mode and act as the Host (Server)")
-	fmt.Println("  --join ADDRESS   Enable online mode and connect to a Host at ADDRESS")
-	fmt.Println("  --port PORT      Specify the port to listen on or connect to (default: 3333)")
+	fmt.Println("  -h, --help          Show this help message")
+	fmt.Println("  -s, --size          Specify board size as ROWSxCOLS (default: 20x30, min: 3x3)")
+	fmt.Println("  --bot               Play against AI in offline mode")
+	fmt.Println("  --host              Enable online mode and act as Host (LAN P2P)")
+	fmt.Println("  --join ADDRESS      Enable online mode and connect to Host (LAN P2P)")
+	fmt.Println("  --port PORT         Specify port for LAN P2P (default: 3333)")
+	fmt.Println("\nCentral Server Online Options:")
+	fmt.Println("  --server HOST:PORT  Connect to Central Server for online matchmaking")
+	fmt.Println("  --user USERNAME     Account username")
+	fmt.Println("  --pass PASSWORD     Account password")
+	fmt.Println("  --register          Register account instead of login")
 }
