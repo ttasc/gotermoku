@@ -1,7 +1,7 @@
-package ui
+package client
 
 import (
-	"github.com/ttasc/gotermoku/internal/core"
+	"github.com/ttasc/gotermoku/internal/common/core"
 	"github.com/ttasc/ttbox"
 )
 
@@ -51,16 +51,32 @@ func handleKeyboard(evt ttbox.Event, state *core.GameState) InputIntent {
 func processMovement(evt ttbox.Event, state *core.GameState) bool {
 	moved := false
 	switch evt.Key {
-	case ttbox.KeyArrowUp: state.SelectedY--; moved = true
-	case ttbox.KeyArrowDown: state.SelectedY++; moved = true
-	case ttbox.KeyArrowLeft: state.SelectedX--; moved = true
-	case ttbox.KeyArrowRight: state.SelectedX++; moved = true
+	case ttbox.KeyArrowUp:
+		state.SelectedY--
+		moved = true
+	case ttbox.KeyArrowDown:
+		state.SelectedY++
+		moved = true
+	case ttbox.KeyArrowLeft:
+		state.SelectedX--
+		moved = true
+	case ttbox.KeyArrowRight:
+		state.SelectedX++
+		moved = true
 	default:
 		switch evt.Ch {
-		case 'k', 'K': state.SelectedY--; moved = true
-		case 'j', 'J': state.SelectedY++; moved = true
-		case 'h', 'H': state.SelectedX--; moved = true
-		case 'l', 'L': state.SelectedX++; moved = true
+		case 'k', 'K':
+			state.SelectedY--
+			moved = true
+		case 'j', 'J':
+			state.SelectedY++
+			moved = true
+		case 'h', 'H':
+			state.SelectedX--
+			moved = true
+		case 'l', 'L':
+			state.SelectedX++
+			moved = true
 		}
 	}
 

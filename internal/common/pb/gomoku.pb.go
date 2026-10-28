@@ -680,7 +680,7 @@ const file_api_proto_gomoku_proto_rawDesc = "" +
 	"\n" +
 	"QueueMatch\x12\x10.pb.QueueRequest\x1a\x11.pb.QueueResponse0\x01\x120\n" +
 	"\n" +
-	"PlayOnline\x12\x10.pb.OnlineAction\x1a\f.pb.GameSync(\x010\x01B.Z,github.com/ttasc/gotermoku/internal/netio/pbb\x06proto3"
+	"PlayOnline\x12\x10.pb.OnlineAction\x1a\f.pb.GameSync(\x010\x01B/Z-github.com/ttasc/gotermoku/internal/common/pbb\x06proto3"
 
 var (
 	file_api_proto_gomoku_proto_rawDescOnce sync.Once

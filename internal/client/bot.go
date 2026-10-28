@@ -1,12 +1,13 @@
-package ai
+package client
 
 import (
 	"math/rand"
 	"time"
-	"github.com/ttasc/gotermoku/internal/core"
+
+	"github.com/ttasc/gotermoku/internal/common/core"
 )
 
-func GetMove(state *core.GameState) [2]int {
+func GetBotMove(state *core.GameState) [2]int {
 	bestScore := -1
 	var bestMoves [][2]int
 
@@ -52,18 +53,32 @@ func evaluateCell(state *core.GameState, x, y int, color uint8) int {
 }
 
 func calculateScore(consecutive, openEnds int) int {
-	if consecutive >= 5 { return 100000 }
+	if consecutive >= 5 {
+		return 100000
+	}
 	if consecutive == 4 {
-		if openEnds == 2 { return 10000 }
-		if openEnds == 1 { return 1000 }
+		if openEnds == 2 {
+			return 10000
+		}
+		if openEnds == 1 {
+			return 1000
+		}
 	}
 	if consecutive == 3 {
-		if openEnds == 2 { return 1000 }
-		if openEnds == 1 { return 100 }
+		if openEnds == 2 {
+			return 1000
+		}
+		if openEnds == 1 {
+			return 100
+		}
 	}
 	if consecutive == 2 {
-		if openEnds == 2 { return 100 }
-		if openEnds == 1 { return 10 }
+		if openEnds == 2 {
+			return 100
+		}
+		if openEnds == 1 {
+			return 10
+		}
 	}
 	return 0
 }

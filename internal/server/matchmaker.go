@@ -6,7 +6,7 @@ import (
 	"math/big"
 	"sync"
 
-	"github.com/ttasc/gotermoku/internal/core"
+	"github.com/ttasc/gotermoku/internal/common/core"
 )
 
 type MatchResult struct {

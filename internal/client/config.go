@@ -1,4 +1,4 @@
-package config
+package client
 
 import (
 	"flag"
@@ -16,7 +16,6 @@ type Config struct {
 	IsHost        bool
 	JoinAddr      string
 	Port          string
-	// Các trường phục vụ Central Server Online
 	ServerAddr    string
 	Username      string
 	Password      string
@@ -39,7 +38,7 @@ func parseDimensions(sizeStr string) (int, int, error) {
 	return rows, cols, nil
 }
 
-func Parse(args []string) *Config {
+func ParseConfig(args []string) *Config {
 	fs := flag.NewFlagSet("gotermoku", flag.ContinueOnError)
 	fs.Usage = func() {}
 
@@ -52,7 +51,6 @@ func Parse(args []string) *Config {
 	sizeStr := fs.String("size", "20x30", "")
 	sizeShorthand := fs.String("s", "20x30", "")
 
-	// Cờ mới cho Central Server
 	serverAddr := fs.String("server", "", "")
 	username := fs.String("user", "", "")
 	password := fs.String("pass", "", "")
@@ -68,7 +66,6 @@ func Parse(args []string) *Config {
 		os.Exit(0)
 	}
 
-	// Kiểm tra loại trừ xung đột các chế độ chơi
 	isCentral := *serverAddr != ""
 	if isCentral && (*botFlag || *hostFlag || *joinAddr != "") {
 		fmt.Println("Error: cannot combine --server with --bot, --host, or --join")

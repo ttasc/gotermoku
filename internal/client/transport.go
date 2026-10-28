@@ -1,11 +1,9 @@
-// internal/netio/transport.go
-package netio
+package client
 
 import (
-	"github.com/ttasc/gotermoku/internal/core"
+	"github.com/ttasc/gotermoku/internal/common/core"
 )
 
-// Transport giữ nguyên thiết kế chuẩn để ẩn đi chi tiết của tầng Network
 type Transport interface {
 	Send(msg NetMessage) error
 	Receive() <-chan NetMessage
@@ -13,7 +11,7 @@ type Transport interface {
 }
 
 type NetMessage struct {
-	Type             string     // "sync", "move", "restart", "disconnect"
+	Type             string // "sync", "move", "restart", "disconnect"
 	X                int
 	Y                int
 	Board            [][]uint8

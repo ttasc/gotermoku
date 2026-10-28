@@ -1,4 +1,4 @@
-package netio
+package client
 
 import (
 	"context"
@@ -8,8 +8,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/ttasc/gotermoku/internal/config"
-	"github.com/ttasc/gotermoku/internal/netio/pb"
+	"github.com/ttasc/gotermoku/internal/common/pb"
 )
 
 type CentralSession struct {
@@ -79,8 +78,7 @@ func (t *centralTransport) readLoop() {
 	}
 }
 
-// ConnectCentral thực hiện toàn bộ luồng Auth, Xếp hàng và Bắt đầu Stream trận đấu
-func ConnectCentral(cfg *config.Config) (*CentralSession, error) {
+func ConnectCentral(cfg *Config) (*CentralSession, error) {
 	fmt.Printf("[NET] Connecting to Central Server at %s...\n", cfg.ServerAddr)
 	conn, err := grpc.NewClient(cfg.ServerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
@@ -90,7 +88,6 @@ func ConnectCentral(cfg *config.Config) (*CentralSession, error) {
 	client := pb.NewGomokuServiceClient(conn)
 	ctx := context.Background()
 
-	// 1. Xác thực (Đăng ký hoặc Đăng nhập)
 	var token string
 	if cfg.IsRegister {
 		fmt.Printf("[AUTH] Registering account '%s'...\n", cfg.Username)
@@ -126,7 +123,6 @@ func ConnectCentral(cfg *config.Config) (*CentralSession, error) {
 		fmt.Println("[AUTH] Login successful!")
 	}
 
-	// 2. Tham gia hàng đợi ghép trận
 	fmt.Println("[MATCHMAKING] Entering matchmaking queue (Press Ctrl+C to abort)...")
 	qStream, err := client.QueueMatch(ctx, &pb.QueueRequest{Token: token})
 	if err != nil {
@@ -154,14 +150,12 @@ func ConnectCentral(cfg *config.Config) (*CentralSession, error) {
 		}
 	}
 
-	// 3. Khởi tạo Stream 2 chiều trận đấu (PlayOnline)
 	playStream, err := client.PlayOnline(context.Background())
 	if err != nil {
 		conn.Close()
 		return nil, fmt.Errorf("failed to open play stream: %w", err)
 	}
 
-	// Gửi gói tin Handshake đầu tiên
 	if err := playStream.Send(&pb.OnlineAction{
 		Token:   token,
 		MatchId: matchResp.MatchId,

@@ -1,11 +1,11 @@
-package ui
+package client
 
 import (
 	"fmt"
 	"os"
 	"time"
 
-	"github.com/ttasc/gotermoku/internal/core"
+	"github.com/ttasc/gotermoku/internal/common/core"
 	"github.com/ttasc/ttbox"
 )
 
@@ -39,7 +39,7 @@ type RenderOpts struct {
 	DisconnectMsg string
 }
 
-func Init(rows, cols int) {
+func InitUI(rows, cols int) {
 	if err := ttbox.Init(); err != nil {
 		fmt.Printf("initializing TUI: %v\n", err)
 		os.Exit(1)
@@ -57,7 +57,7 @@ func Init(rows, cols int) {
 	ttbox.EnableMouse()
 }
 
-func Close() {
+func CloseUI() {
 	ttbox.DisableMouse()
 	ttbox.Close()
 }

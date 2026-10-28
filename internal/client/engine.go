@@ -1,22 +1,18 @@
-package engine
+package client
 
 import (
 	"time"
 
-	"github.com/ttasc/gotermoku/internal/ai"
-	"github.com/ttasc/gotermoku/internal/config"
-	"github.com/ttasc/gotermoku/internal/core"
-	"github.com/ttasc/gotermoku/internal/netio"
-	"github.com/ttasc/gotermoku/internal/ui"
+	"github.com/ttasc/gotermoku/internal/common/core"
 	"github.com/ttasc/ttbox"
 )
 
-// Run unifies Hotseat, Bot, Host, Client, and Central Online loops into a single orchestration layer.
-func Run(cfg *config.Config, state *core.GameState, t netio.Transport) {
+// RunEngine thống nhất vòng lặp sự kiện của tất cả các chế độ
+func RunEngine(cfg *Config, state *core.GameState, t Transport) {
 	opts := buildRenderOpts(cfg)
 
 	if cfg.IsHost {
-		netio.BroadcastSync(state, t)
+		BroadcastSync(state, t)
 	}
 
 	botMoves := make(chan [2]int, 1)
@@ -27,7 +23,7 @@ func Run(cfg *config.Config, state *core.GameState, t netio.Transport) {
 			botThinking = true
 			go func(s *core.GameState) {
 				time.Sleep(400 * time.Millisecond)
-				botMoves <- ai.GetMove(s)
+				botMoves <- GetBotMove(s)
 			}(state)
 		}
 
@@ -46,29 +42,27 @@ func Run(cfg *config.Config, state *core.GameState, t netio.Transport) {
 
 		evt, err := ttbox.PollEventTimeout(50 * time.Millisecond)
 		if err == nil {
-			intent := ui.HandleInput(evt, state)
-			if intent.Action == ui.ActionQuit {
+			intent := HandleInput(evt, state)
+			if intent.Action == ActionQuit {
 				break
 			}
 			processIntent(cfg, intent, state, t)
 		}
 
-		ui.Render(state, opts)
+		Render(state, opts)
 	}
 }
 
-func buildRenderOpts(cfg *config.Config) ui.RenderOpts {
-	opts := ui.RenderOpts{LocalColor: core.Empty, OppName: ""}
+func buildRenderOpts(cfg *Config) RenderOpts {
+	opts := RenderOpts{LocalColor: core.Empty, OppName: ""}
 	if cfg.IsBotMode {
 		opts.LocalColor = core.White
 		opts.OppName = "Bot"
 	} else if cfg.IsOnline {
-		// Nhánh Central Server: Dùng màu quân và tên đối thủ được server gán
 		if cfg.IsCentralMode {
 			opts.LocalColor = cfg.AssignedColor
 			opts.OppName = cfg.OpponentName
 		} else {
-			// Nhánh LAN P2P truyền thống
 			opts.OppName = "Opponent"
 			if cfg.IsHost {
 				opts.LocalColor = core.White
@@ -80,7 +74,7 @@ func buildRenderOpts(cfg *config.Config) ui.RenderOpts {
 	return opts
 }
 
-func processNetwork(cfg *config.Config, state *core.GameState, t netio.Transport, opts *ui.RenderOpts) {
+func processNetwork(cfg *Config, state *core.GameState, t Transport, opts *RenderOpts) {
 	select {
 	case msg := <-t.Receive():
 		if msg.Type == "disconnect" {
@@ -103,41 +97,38 @@ func processNetwork(cfg *config.Config, state *core.GameState, t netio.Transport
 		} else if msg.Type == "move" && cfg.IsHost {
 			if state.CurrentTurn == core.Black && core.CanPlacePiece(state, msg.X, msg.Y) {
 				core.PlacePiece(state, msg.X, msg.Y, core.Black)
-				netio.BroadcastSync(state, t)
+				BroadcastSync(state, t)
 			}
 		} else if msg.Type == "restart" && cfg.IsHost {
 			state.Reset()
-			netio.BroadcastSync(state, t)
+			BroadcastSync(state, t)
 		}
 	default:
 	}
 }
 
-func processIntent(cfg *config.Config, intent ui.InputIntent, state *core.GameState, t netio.Transport) {
-	if intent.Action == ui.ActionRestart && state.Winner != core.Empty {
+func processIntent(cfg *Config, intent InputIntent, state *core.GameState, t Transport) {
+	if intent.Action == ActionRestart && state.Winner != core.Empty {
 		if cfg.IsOnline && !cfg.IsHost {
-			t.Send(netio.NetMessage{Type: "restart"})
+			t.Send(NetMessage{Type: "restart"})
 		} else {
 			state.Reset()
 			if cfg.IsHost {
-				netio.BroadcastSync(state, t)
+				BroadcastSync(state, t)
 			}
 		}
 		return
 	}
 
-	if intent.Action == ui.ActionPlace {
+	if intent.Action == ActionPlace {
 		if cfg.IsOnline && !cfg.IsHost {
-			// Mặc định LAN Client là quân Đen
 			allowedTurn := core.Black
-
-			// Với Central Server: Cho phép đi nếu lượt hiện tại trùng với màu cờ được gán (Trắng hoặc Đen)
 			if cfg.IsCentralMode {
 				allowedTurn = cfg.AssignedColor
 			}
 
 			if state.CurrentTurn == allowedTurn && core.CanPlacePiece(state, intent.X, intent.Y) {
-				t.Send(netio.NetMessage{Type: "move", X: intent.X, Y: intent.Y})
+				t.Send(NetMessage{Type: "move", X: intent.X, Y: intent.Y})
 			}
 			return
 		}
@@ -153,7 +144,7 @@ func processIntent(cfg *config.Config, intent ui.InputIntent, state *core.GameSt
 		if turnAllowed && core.CanPlacePiece(state, intent.X, intent.Y) {
 			core.PlacePiece(state, intent.X, intent.Y, colorToPlace)
 			if cfg.IsHost {
-				netio.BroadcastSync(state, t)
+				BroadcastSync(state, t)
 			}
 		}
 	}

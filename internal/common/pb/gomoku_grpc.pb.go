@@ -32,7 +32,7 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type GomokuServiceClient interface {
-	// 1. Chế độ LAN P2P hiện hữu (giữ nguyên cấu trúc)
+	// 1. Chế độ LAN P2P hiện hữu
 	PlayStream(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ClientAction, GameSync], error)
 	// 2. Chế độ Online qua Server trung tâm
 	Register(ctx context.Context, in *AuthRequest, opts ...grpc.CallOption) (*AuthResponse, error)
@@ -118,7 +118,7 @@ type GomokuService_PlayOnlineClient = grpc.BidiStreamingClient[OnlineAction, Gam
 // All implementations must embed UnimplementedGomokuServiceServer
 // for forward compatibility.
 type GomokuServiceServer interface {
-	// 1. Chế độ LAN P2P hiện hữu (giữ nguyên cấu trúc)
+	// 1. Chế độ LAN P2P hiện hữu
 	PlayStream(grpc.BidiStreamingServer[ClientAction, GameSync]) error
 	// 2. Chế độ Online qua Server trung tâm
 	Register(context.Context, *AuthRequest) (*AuthResponse, error)

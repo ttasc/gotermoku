@@ -4,8 +4,8 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/ttasc/gotermoku/internal/core"
-	"github.com/ttasc/gotermoku/internal/netio/pb"
+	"github.com/ttasc/gotermoku/internal/common/core"
+	"github.com/ttasc/gotermoku/internal/common/pb"
 )
 
 type RoomPlayer struct {
@@ -46,10 +46,21 @@ func NewRoom(id string, whiteUser, whiteToken, blackUser, blackToken string, row
 	return r
 }
 
-func (r *Room) BroadcastInitialState() {
+// SyncToPlayer gửi trạng thái hiện tại riêng cho một người chơi vừa kết nối stream
+func (r *Room) SyncToPlayer(token string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.broadcastLocked("sync", "")
+
+	player := r.getPlayerByToken(token)
+	if player == nil {
+		return
+	}
+
+	syncMsg := r.toGameSync("sync", "")
+	select {
+	case player.SendChan <- syncMsg:
+	default:
+	}
 }
 
 func (r *Room) HandleAction(token string, action *pb.ClientAction) error {
@@ -67,7 +78,6 @@ func (r *Room) HandleAction(token string, action *pb.ClientAction) error {
 
 	switch action.Type {
 	case "move":
-		// Chỉ cho phép đi khi đúng lượt
 		if r.State.CurrentTurn != player.Color {
 			return errors.New("not your turn")
 		}
@@ -79,7 +89,6 @@ func (r *Room) HandleAction(token string, action *pb.ClientAction) error {
 		r.broadcastLocked("sync", "")
 
 	case "restart":
-		// Chỉ cho phép restart khi ván đấu đã kết thúc
 		if r.State.Winner != core.Empty {
 			r.State.Reset()
 			r.broadcastLocked("sync", "")
@@ -123,7 +132,6 @@ func (r *Room) getPlayerByToken(token string) *RoomPlayer {
 func (r *Room) broadcastLocked(msgType, text string) {
 	syncMsg := r.toGameSync(msgType, text)
 
-	// Gửi non-blocking tới cả 2 người chơi để tránh nghẽn
 	select {
 	case r.White.SendChan <- syncMsg:
 	default:

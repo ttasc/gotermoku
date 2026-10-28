@@ -1,7 +1,7 @@
 // api/proto/gomoku.proto
 syntax = "proto3";
 package pb;
-option go_package = "github.com/ttasc/gotermoku/internal/netio/pb";
+option go_package = "github.com/ttasc/gotermoku/internal/common/pb";
 
 // ==========================================
 // CORE GAME MODELS (Dùng chung cho LAN & Server)
@@ -88,7 +88,7 @@ message OnlineAction {
 // ==========================================
 
 service GomokuService {
-    // 1. Chế độ LAN P2P hiện hữu (giữ nguyên cấu trúc)
+    // 1. Chế độ LAN P2P hiện hữu
     rpc PlayStream(stream ClientAction) returns (stream GameSync);
 
     // 2. Chế độ Online qua Server trung tâm

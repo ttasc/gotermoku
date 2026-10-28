@@ -1,5 +1,4 @@
-// internal/netio/grpc_transport.go
-package netio
+package client
 
 import (
 	"context"
@@ -10,8 +9,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/ttasc/gotermoku/internal/config"
-	"github.com/ttasc/gotermoku/internal/netio/pb"
+	"github.com/ttasc/gotermoku/internal/common/pb"
 )
 
 // ==========================================
@@ -26,9 +24,8 @@ type grpcHostTransport struct {
 	streamOk chan pb.GomokuService_PlayStreamServer
 }
 
-// PlayStream được gRPC tự động gọi khi Client kết nối tới
 func (t *grpcHostTransport) PlayStream(stream pb.GomokuService_PlayStreamServer) error {
-	t.streamOk <- stream // Báo cho InitTransport biết đã có Client kết nối
+	t.streamOk <- stream
 	for {
 		req, err := stream.Recv()
 		if err != nil {
@@ -62,7 +59,7 @@ func (t *grpcHostTransport) Send(msg NetMessage) error {
 }
 
 func (t *grpcHostTransport) Receive() <-chan NetMessage { return t.incoming }
-func (t *grpcHostTransport) Close() { t.server.Stop() }
+func (t *grpcHostTransport) Close()                    { t.server.Stop() }
 
 // ==========================================
 // CLIENT TRANSPORT
@@ -105,13 +102,13 @@ func (t *grpcClientTransport) readLoop() {
 }
 
 func (t *grpcClientTransport) Receive() <-chan NetMessage { return t.incoming }
-func (t *grpcClientTransport) Close() { t.conn.Close() }
+func (t *grpcClientTransport) Close()                    { t.conn.Close() }
 
 // ==========================================
 // INITIALIZATION
 // ==========================================
 
-func InitTransport(cfg *config.Config) Transport {
+func InitLANTransport(cfg *Config) Transport {
 	if cfg.IsHost {
 		fmt.Printf("Starting gRPC Host... Waiting for client to connect on port %s...\n", cfg.Port)
 		ln, err := net.Listen("tcp", ":"+cfg.Port)
@@ -134,7 +131,7 @@ func InitTransport(cfg *config.Config) Transport {
 			}
 		}()
 
-		t.stream = <-t.streamOk // Block chương trình cho tới khi Client bấm join
+		t.stream = <-t.streamOk
 		return t
 
 	} else {

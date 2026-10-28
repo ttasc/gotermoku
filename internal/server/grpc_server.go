@@ -8,7 +8,7 @@ import (
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/status"
 
-	"github.com/ttasc/gotermoku/internal/netio/pb"
+	"github.com/ttasc/gotermoku/internal/common/pb"
 )
 
 type CentralServer struct {
@@ -37,7 +37,6 @@ func getClientIP(ctx context.Context) string {
 	return p.Addr.String()
 }
 
-// Register xử lý đăng ký tài khoản mới kèm kiểm tra Rate Limiter
 func (s *CentralServer) Register(ctx context.Context, req *pb.AuthRequest) (*pb.AuthResponse, error) {
 	ip := getClientIP(ctx)
 	token, err := s.auth.Register(ip, req.Username, req.Password)
@@ -47,7 +46,6 @@ func (s *CentralServer) Register(ctx context.Context, req *pb.AuthRequest) (*pb.
 	return &pb.AuthResponse{Success: true, Message: "Registration successful", Token: token}, nil
 }
 
-// Login xử lý đăng nhập, so sánh hash mật khẩu an toàn và cấp token phiên
 func (s *CentralServer) Login(ctx context.Context, req *pb.AuthRequest) (*pb.AuthResponse, error) {
 	ip := getClientIP(ctx)
 	token, err := s.auth.Login(ip, req.Username, req.Password)
@@ -57,7 +55,6 @@ func (s *CentralServer) Login(ctx context.Context, req *pb.AuthRequest) (*pb.Aut
 	return &pb.AuthResponse{Success: true, Message: "Login successful", Token: token}, nil
 }
 
-// QueueMatch nhận yêu cầu xếp hàng, giữ kết nối stream để báo trạng thái và trả về phòng đấu khi tìm thấy
 func (s *CentralServer) QueueMatch(req *pb.QueueRequest, stream pb.GomokuService_QueueMatchServer) error {
 	username, ok := s.auth.ValidateToken(req.Token)
 	if !ok {
@@ -67,7 +64,6 @@ func (s *CentralServer) QueueMatch(req *pb.QueueRequest, stream pb.GomokuService
 		})
 	}
 
-	// Thông báo trạng thái đang chờ ghép đối thủ
 	if err := stream.Send(&pb.QueueResponse{
 		Status:  pb.QueueStatus_QUEUE_WAITING,
 		Message: "Searching for an opponent...",
@@ -78,7 +74,6 @@ func (s *CentralServer) QueueMatch(req *pb.QueueRequest, stream pb.GomokuService
 	resultCh, cancel := s.matchmaker.Enqueue(username, req.Token)
 	defer cancel()
 
-	// Chờ ghép trận hoặc client hủy kết nối / ngắt tín hiệu
 	select {
 	case <-stream.Context().Done():
 		return stream.Context().Err()
@@ -101,9 +96,7 @@ func (s *CentralServer) QueueMatch(req *pb.QueueRequest, stream pb.GomokuService
 	}
 }
 
-// PlayOnline thiết lập luồng truyền nhận 2 chiều thời gian thực trong phòng đấu
 func (s *CentralServer) PlayOnline(stream pb.GomokuService_PlayOnlineServer) error {
-	// Gói tin đầu tiên là Handshake chứa Token và MatchId
 	firstMsg, err := stream.Recv()
 	if err != nil {
 		return err
@@ -126,7 +119,6 @@ func (s *CentralServer) PlayOnline(stream pb.GomokuService_PlayOnlineServer) err
 
 	errChan := make(chan error, 2)
 
-	// Luồng 1: Chuyển tiếp trạng thái bàn cờ từ phòng đấu về Client
 	go func() {
 		for syncMsg := range player.SendChan {
 			if err := stream.Send(syncMsg); err != nil {
@@ -136,10 +128,9 @@ func (s *CentralServer) PlayOnline(stream pb.GomokuService_PlayOnlineServer) err
 		}
 	}()
 
-	// Đồng bộ bàn cờ ban đầu cho người chơi
-	room.BroadcastInitialState()
+	// Chỉ đồng bộ trạng thái ban đầu riêng cho người chơi vừa hoàn tất handshake
+	room.SyncToPlayer(firstMsg.Token)
 
-	// Luồng 2: Tiếp nhận các hành động (nước đi / restart) từ Client
 	go func() {
 		for {
 			req, err := stream.Recv()
@@ -154,12 +145,10 @@ func (s *CentralServer) PlayOnline(stream pb.GomokuService_PlayOnlineServer) err
 		}
 	}()
 
-	// Chờ cho đến khi 1 trong 2 luồng gặp lỗi hoặc client đóng kết nối
 	err = <-errChan
 	return err
 }
 
-// PlayStream từ chối trên Central Server vì chỉ dùng riêng cho LAN P2P
 func (s *CentralServer) PlayStream(stream pb.GomokuService_PlayStreamServer) error {
 	return status.Error(codes.Unimplemented, "PlayStream is reserved for LAN P2P mode")
 }
