@@ -42,6 +42,12 @@ func PlacePiece(state *GameState, x, y int, color uint8) {
 	updateWinState(state, x, y)
 
 	if state.Winner == Empty {
+		// Kiểm tra hòa cờ O(1): Khi toàn bộ ô cờ đã được lấp đầy mà không có ai thắng
+		if state.MoveCount[White]+state.MoveCount[Black] >= state.Rows*state.Cols {
+			state.Winner = Draw
+			return
+		}
+
 		if state.CurrentTurn == White {
 			state.CurrentTurn = Black
 		} else {

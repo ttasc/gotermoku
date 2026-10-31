@@ -6,6 +6,7 @@ const (
 	Empty uint8 = iota
 	White
 	Black
+	Draw
 )
 
 type GameState struct {
@@ -56,7 +57,7 @@ func (s *GameState) Reset() {
 }
 
 func (s *GameState) IsWinPos(x, y int) bool {
-	if s.Winner == Empty {
+	if s.Winner == Empty || s.Winner == Draw {
 		return false
 	}
 	for _, pos := range s.WinningPositions {

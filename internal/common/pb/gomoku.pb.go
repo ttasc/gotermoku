@@ -77,7 +77,7 @@ func (QueueStatus) EnumDescriptor() ([]byte, []int) {
 
 type BoardRow struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Cells         []byte                 `protobuf:"bytes,1,opt,name=cells,proto3" json:"cells,omitempty"` // bytes ánh xạ trực tiếp 1-1 với []uint8 trong Go
+	Cells         []byte                 `protobuf:"bytes,1,opt,name=cells,proto3" json:"cells,omitempty"` // bytes ánh xạ 1-1 với []uint8 trong Go
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -234,15 +234,19 @@ func (x *ClientAction) GetY() int32 {
 
 // Host / Server -> Client (Đồng bộ GameState)
 type GameSync struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	Type             string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"` // "sync", "disconnect", "error"
-	CurrentTurn      int32                  `protobuf:"varint,2,opt,name=current_turn,json=currentTurn,proto3" json:"current_turn,omitempty"`
-	Winner           int32                  `protobuf:"varint,3,opt,name=winner,proto3" json:"winner,omitempty"`
-	Board            []*BoardRow            `protobuf:"bytes,4,rep,name=board,proto3" json:"board,omitempty"`
-	WinningPositions []*Position            `protobuf:"bytes,5,rep,name=winning_positions,json=winningPositions,proto3" json:"winning_positions,omitempty"`
-	Message          string                 `protobuf:"bytes,6,opt,name=message,proto3" json:"message,omitempty"` // Thông báo trạng thái (nếu có)
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	Type                  string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"` // "sync", "disconnect", "pause", "resume", "error"
+	CurrentTurn           int32                  `protobuf:"varint,2,opt,name=current_turn,json=currentTurn,proto3" json:"current_turn,omitempty"`
+	Winner                int32                  `protobuf:"varint,3,opt,name=winner,proto3" json:"winner,omitempty"` // 0: Empty, 1: White, 2: Black, 3: Draw
+	Board                 []*BoardRow            `protobuf:"bytes,4,rep,name=board,proto3" json:"board,omitempty"`
+	WinningPositions      []*Position            `protobuf:"bytes,5,rep,name=winning_positions,json=winningPositions,proto3" json:"winning_positions,omitempty"`
+	Message               string                 `protobuf:"bytes,6,opt,name=message,proto3" json:"message,omitempty"`
+	IsPaused              bool                   `protobuf:"varint,7,opt,name=is_paused,json=isPaused,proto3" json:"is_paused,omitempty"`                                          // Trận đấu đang tạm dừng (chờ đối thủ reconnect)
+	GraceSecondsRemaining int32                  `protobuf:"varint,8,opt,name=grace_seconds_remaining,json=graceSecondsRemaining,proto3" json:"grace_seconds_remaining,omitempty"` // Số giây còn lại của thời gian ân hạn
+	WhiteElo              int32                  `protobuf:"varint,9,opt,name=white_elo,json=whiteElo,proto3" json:"white_elo,omitempty"`
+	BlackElo              int32                  `protobuf:"varint,10,opt,name=black_elo,json=blackElo,proto3" json:"black_elo,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *GameSync) Reset() {
@@ -317,6 +321,34 @@ func (x *GameSync) GetMessage() string {
 	return ""
 }
 
+func (x *GameSync) GetIsPaused() bool {
+	if x != nil {
+		return x.IsPaused
+	}
+	return false
+}
+
+func (x *GameSync) GetGraceSecondsRemaining() int32 {
+	if x != nil {
+		return x.GraceSecondsRemaining
+	}
+	return 0
+}
+
+func (x *GameSync) GetWhiteElo() int32 {
+	if x != nil {
+		return x.WhiteElo
+	}
+	return 0
+}
+
+func (x *GameSync) GetBlackElo() int32 {
+	if x != nil {
+		return x.BlackElo
+	}
+	return 0
+}
+
 type AuthRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Username      string                 `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`
@@ -374,6 +406,7 @@ type AuthResponse struct {
 	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
 	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
 	Token         string                 `protobuf:"bytes,3,opt,name=token,proto3" json:"token,omitempty"`
+	Elo           int32                  `protobuf:"varint,4,opt,name=elo,proto3" json:"elo,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -429,9 +462,15 @@ func (x *AuthResponse) GetToken() string {
 	return ""
 }
 
+func (x *AuthResponse) GetElo() int32 {
+	if x != nil {
+		return x.Elo
+	}
+	return 0
+}
+
 type QueueRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Token         string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -466,22 +505,18 @@ func (*QueueRequest) Descriptor() ([]byte, []int) {
 	return file_api_proto_gomoku_proto_rawDescGZIP(), []int{6}
 }
 
-func (x *QueueRequest) GetToken() string {
-	if x != nil {
-		return x.Token
-	}
-	return ""
-}
-
 type QueueResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Status        QueueStatus            `protobuf:"varint,1,opt,name=status,proto3,enum=pb.QueueStatus" json:"status,omitempty"`
 	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
 	MatchId       string                 `protobuf:"bytes,3,opt,name=match_id,json=matchId,proto3" json:"match_id,omitempty"`
 	OpponentName  string                 `protobuf:"bytes,4,opt,name=opponent_name,json=opponentName,proto3" json:"opponent_name,omitempty"`
-	AssignedColor int32                  `protobuf:"varint,5,opt,name=assigned_color,json=assignedColor,proto3" json:"assigned_color,omitempty"` // 1: White (đi trước), 2: Black (đi sau)
+	AssignedColor int32                  `protobuf:"varint,5,opt,name=assigned_color,json=assignedColor,proto3" json:"assigned_color,omitempty"` // 1: White, 2: Black
 	Rows          int32                  `protobuf:"varint,6,opt,name=rows,proto3" json:"rows,omitempty"`
 	Cols          int32                  `protobuf:"varint,7,opt,name=cols,proto3" json:"cols,omitempty"`
+	OpponentElo   int32                  `protobuf:"varint,8,opt,name=opponent_elo,json=opponentElo,proto3" json:"opponent_elo,omitempty"`
+	YourElo       int32                  `protobuf:"varint,9,opt,name=your_elo,json=yourElo,proto3" json:"your_elo,omitempty"`
+	RoomCode      string                 `protobuf:"bytes,10,opt,name=room_code,json=roomCode,proto3" json:"room_code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -565,18 +600,347 @@ func (x *QueueResponse) GetCols() int32 {
 	return 0
 }
 
-type OnlineAction struct {
+func (x *QueueResponse) GetOpponentElo() int32 {
+	if x != nil {
+		return x.OpponentElo
+	}
+	return 0
+}
+
+func (x *QueueResponse) GetYourElo() int32 {
+	if x != nil {
+		return x.YourElo
+	}
+	return 0
+}
+
+func (x *QueueResponse) GetRoomCode() string {
+	if x != nil {
+		return x.RoomCode
+	}
+	return ""
+}
+
+type CreateRoomRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Token         string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
-	MatchId       string                 `protobuf:"bytes,2,opt,name=match_id,json=matchId,proto3" json:"match_id,omitempty"`
-	Action        *ClientAction          `protobuf:"bytes,3,opt,name=action,proto3" json:"action,omitempty"`
+	Rows          int32                  `protobuf:"varint,1,opt,name=rows,proto3" json:"rows,omitempty"`
+	Cols          int32                  `protobuf:"varint,2,opt,name=cols,proto3" json:"cols,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateRoomRequest) Reset() {
+	*x = CreateRoomRequest{}
+	mi := &file_api_proto_gomoku_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateRoomRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateRoomRequest) ProtoMessage() {}
+
+func (x *CreateRoomRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_gomoku_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateRoomRequest.ProtoReflect.Descriptor instead.
+func (*CreateRoomRequest) Descriptor() ([]byte, []int) {
+	return file_api_proto_gomoku_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *CreateRoomRequest) GetRows() int32 {
+	if x != nil {
+		return x.Rows
+	}
+	return 0
+}
+
+func (x *CreateRoomRequest) GetCols() int32 {
+	if x != nil {
+		return x.Cols
+	}
+	return 0
+}
+
+type CreateRoomResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	RoomCode      string                 `protobuf:"bytes,3,opt,name=room_code,json=roomCode,proto3" json:"room_code,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateRoomResponse) Reset() {
+	*x = CreateRoomResponse{}
+	mi := &file_api_proto_gomoku_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateRoomResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateRoomResponse) ProtoMessage() {}
+
+func (x *CreateRoomResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_gomoku_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateRoomResponse.ProtoReflect.Descriptor instead.
+func (*CreateRoomResponse) Descriptor() ([]byte, []int) {
+	return file_api_proto_gomoku_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *CreateRoomResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *CreateRoomResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *CreateRoomResponse) GetRoomCode() string {
+	if x != nil {
+		return x.RoomCode
+	}
+	return ""
+}
+
+type JoinRoomRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RoomCode      string                 `protobuf:"bytes,1,opt,name=room_code,json=roomCode,proto3" json:"room_code,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *JoinRoomRequest) Reset() {
+	*x = JoinRoomRequest{}
+	mi := &file_api_proto_gomoku_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *JoinRoomRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*JoinRoomRequest) ProtoMessage() {}
+
+func (x *JoinRoomRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_gomoku_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use JoinRoomRequest.ProtoReflect.Descriptor instead.
+func (*JoinRoomRequest) Descriptor() ([]byte, []int) {
+	return file_api_proto_gomoku_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *JoinRoomRequest) GetRoomCode() string {
+	if x != nil {
+		return x.RoomCode
+	}
+	return ""
+}
+
+type RejoinRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	MatchId       string                 `protobuf:"bytes,1,opt,name=match_id,json=matchId,proto3" json:"match_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RejoinRequest) Reset() {
+	*x = RejoinRequest{}
+	mi := &file_api_proto_gomoku_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RejoinRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RejoinRequest) ProtoMessage() {}
+
+func (x *RejoinRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_gomoku_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RejoinRequest.ProtoReflect.Descriptor instead.
+func (*RejoinRequest) Descriptor() ([]byte, []int) {
+	return file_api_proto_gomoku_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *RejoinRequest) GetMatchId() string {
+	if x != nil {
+		return x.MatchId
+	}
+	return ""
+}
+
+type RejoinResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	MatchId       string                 `protobuf:"bytes,3,opt,name=match_id,json=matchId,proto3" json:"match_id,omitempty"`
+	OpponentName  string                 `protobuf:"bytes,4,opt,name=opponent_name,json=opponentName,proto3" json:"opponent_name,omitempty"`
+	AssignedColor int32                  `protobuf:"varint,5,opt,name=assigned_color,json=assignedColor,proto3" json:"assigned_color,omitempty"`
+	Rows          int32                  `protobuf:"varint,6,opt,name=rows,proto3" json:"rows,omitempty"`
+	Cols          int32                  `protobuf:"varint,7,opt,name=cols,proto3" json:"cols,omitempty"`
+	OpponentElo   int32                  `protobuf:"varint,8,opt,name=opponent_elo,json=opponentElo,proto3" json:"opponent_elo,omitempty"`
+	YourElo       int32                  `protobuf:"varint,9,opt,name=your_elo,json=yourElo,proto3" json:"your_elo,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RejoinResponse) Reset() {
+	*x = RejoinResponse{}
+	mi := &file_api_proto_gomoku_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RejoinResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RejoinResponse) ProtoMessage() {}
+
+func (x *RejoinResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_proto_gomoku_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RejoinResponse.ProtoReflect.Descriptor instead.
+func (*RejoinResponse) Descriptor() ([]byte, []int) {
+	return file_api_proto_gomoku_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *RejoinResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *RejoinResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *RejoinResponse) GetMatchId() string {
+	if x != nil {
+		return x.MatchId
+	}
+	return ""
+}
+
+func (x *RejoinResponse) GetOpponentName() string {
+	if x != nil {
+		return x.OpponentName
+	}
+	return ""
+}
+
+func (x *RejoinResponse) GetAssignedColor() int32 {
+	if x != nil {
+		return x.AssignedColor
+	}
+	return 0
+}
+
+func (x *RejoinResponse) GetRows() int32 {
+	if x != nil {
+		return x.Rows
+	}
+	return 0
+}
+
+func (x *RejoinResponse) GetCols() int32 {
+	if x != nil {
+		return x.Cols
+	}
+	return 0
+}
+
+func (x *RejoinResponse) GetOpponentElo() int32 {
+	if x != nil {
+		return x.OpponentElo
+	}
+	return 0
+}
+
+func (x *RejoinResponse) GetYourElo() int32 {
+	if x != nil {
+		return x.YourElo
+	}
+	return 0
+}
+
+type OnlineAction struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Token đã được chuyển sang gRPC Metadata Header ("authorization")
+	MatchId       string        `protobuf:"bytes,1,opt,name=match_id,json=matchId,proto3" json:"match_id,omitempty"`
+	Action        *ClientAction `protobuf:"bytes,2,opt,name=action,proto3" json:"action,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *OnlineAction) Reset() {
 	*x = OnlineAction{}
-	mi := &file_api_proto_gomoku_proto_msgTypes[8]
+	mi := &file_api_proto_gomoku_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -588,7 +952,7 @@ func (x *OnlineAction) String() string {
 func (*OnlineAction) ProtoMessage() {}
 
 func (x *OnlineAction) ProtoReflect() protoreflect.Message {
-	mi := &file_api_proto_gomoku_proto_msgTypes[8]
+	mi := &file_api_proto_gomoku_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -601,14 +965,7 @@ func (x *OnlineAction) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OnlineAction.ProtoReflect.Descriptor instead.
 func (*OnlineAction) Descriptor() ([]byte, []int) {
-	return file_api_proto_gomoku_proto_rawDescGZIP(), []int{8}
-}
-
-func (x *OnlineAction) GetToken() string {
-	if x != nil {
-		return x.Token
-	}
-	return ""
+	return file_api_proto_gomoku_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *OnlineAction) GetMatchId() string {
@@ -638,23 +995,28 @@ const file_api_proto_gomoku_proto_rawDesc = "" +
 	"\fClientAction\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12\f\n" +
 	"\x01x\x18\x02 \x01(\x05R\x01x\x12\f\n" +
-	"\x01y\x18\x03 \x01(\x05R\x01y\"\xd2\x01\n" +
+	"\x01y\x18\x03 \x01(\x05R\x01y\"\xe1\x02\n" +
 	"\bGameSync\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12!\n" +
 	"\fcurrent_turn\x18\x02 \x01(\x05R\vcurrentTurn\x12\x16\n" +
 	"\x06winner\x18\x03 \x01(\x05R\x06winner\x12\"\n" +
 	"\x05board\x18\x04 \x03(\v2\f.pb.BoardRowR\x05board\x129\n" +
 	"\x11winning_positions\x18\x05 \x03(\v2\f.pb.PositionR\x10winningPositions\x12\x18\n" +
-	"\amessage\x18\x06 \x01(\tR\amessage\"E\n" +
+	"\amessage\x18\x06 \x01(\tR\amessage\x12\x1b\n" +
+	"\tis_paused\x18\a \x01(\bR\bisPaused\x126\n" +
+	"\x17grace_seconds_remaining\x18\b \x01(\x05R\x15graceSecondsRemaining\x12\x1b\n" +
+	"\twhite_elo\x18\t \x01(\x05R\bwhiteElo\x12\x1b\n" +
+	"\tblack_elo\x18\n" +
+	" \x01(\x05R\bblackElo\"E\n" +
 	"\vAuthRequest\x12\x1a\n" +
 	"\busername\x18\x01 \x01(\tR\busername\x12\x1a\n" +
-	"\bpassword\x18\x02 \x01(\tR\bpassword\"X\n" +
+	"\bpassword\x18\x02 \x01(\tR\bpassword\"j\n" +
 	"\fAuthResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12\x14\n" +
-	"\x05token\x18\x03 \x01(\tR\x05token\"$\n" +
-	"\fQueueRequest\x12\x14\n" +
-	"\x05token\x18\x01 \x01(\tR\x05token\"\xe1\x01\n" +
+	"\x05token\x18\x03 \x01(\tR\x05token\x12\x10\n" +
+	"\x03elo\x18\x04 \x01(\x05R\x03elo\"\x0e\n" +
+	"\fQueueRequest\"\xbc\x02\n" +
 	"\rQueueResponse\x12'\n" +
 	"\x06status\x18\x01 \x01(\x0e2\x0f.pb.QueueStatusR\x06status\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12\x19\n" +
@@ -662,23 +1024,50 @@ const file_api_proto_gomoku_proto_rawDesc = "" +
 	"\ropponent_name\x18\x04 \x01(\tR\fopponentName\x12%\n" +
 	"\x0eassigned_color\x18\x05 \x01(\x05R\rassignedColor\x12\x12\n" +
 	"\x04rows\x18\x06 \x01(\x05R\x04rows\x12\x12\n" +
-	"\x04cols\x18\a \x01(\x05R\x04cols\"i\n" +
-	"\fOnlineAction\x12\x14\n" +
-	"\x05token\x18\x01 \x01(\tR\x05token\x12\x19\n" +
-	"\bmatch_id\x18\x02 \x01(\tR\amatchId\x12(\n" +
-	"\x06action\x18\x03 \x01(\v2\x10.pb.ClientActionR\x06action*Y\n" +
+	"\x04cols\x18\a \x01(\x05R\x04cols\x12!\n" +
+	"\fopponent_elo\x18\b \x01(\x05R\vopponentElo\x12\x19\n" +
+	"\byour_elo\x18\t \x01(\x05R\ayourElo\x12\x1b\n" +
+	"\troom_code\x18\n" +
+	" \x01(\tR\broomCode\";\n" +
+	"\x11CreateRoomRequest\x12\x12\n" +
+	"\x04rows\x18\x01 \x01(\x05R\x04rows\x12\x12\n" +
+	"\x04cols\x18\x02 \x01(\x05R\x04cols\"e\n" +
+	"\x12CreateRoomResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12\x1b\n" +
+	"\troom_code\x18\x03 \x01(\tR\broomCode\".\n" +
+	"\x0fJoinRoomRequest\x12\x1b\n" +
+	"\troom_code\x18\x01 \x01(\tR\broomCode\"*\n" +
+	"\rRejoinRequest\x12\x19\n" +
+	"\bmatch_id\x18\x01 \x01(\tR\amatchId\"\x91\x02\n" +
+	"\x0eRejoinResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12\x19\n" +
+	"\bmatch_id\x18\x03 \x01(\tR\amatchId\x12#\n" +
+	"\ropponent_name\x18\x04 \x01(\tR\fopponentName\x12%\n" +
+	"\x0eassigned_color\x18\x05 \x01(\x05R\rassignedColor\x12\x12\n" +
+	"\x04rows\x18\x06 \x01(\x05R\x04rows\x12\x12\n" +
+	"\x04cols\x18\a \x01(\x05R\x04cols\x12!\n" +
+	"\fopponent_elo\x18\b \x01(\x05R\vopponentElo\x12\x19\n" +
+	"\byour_elo\x18\t \x01(\x05R\ayourElo\"S\n" +
+	"\fOnlineAction\x12\x19\n" +
+	"\bmatch_id\x18\x01 \x01(\tR\amatchId\x12(\n" +
+	"\x06action\x18\x02 \x01(\v2\x10.pb.ClientActionR\x06action*Y\n" +
 	"\vQueueStatus\x12\x11\n" +
 	"\rQUEUE_WAITING\x10\x00\x12\x11\n" +
 	"\rQUEUE_MATCHED\x10\x01\x12\x13\n" +
 	"\x0fQUEUE_CANCELLED\x10\x02\x12\x0f\n" +
-	"\vQUEUE_ERROR\x10\x032\x83\x02\n" +
+	"\vQUEUE_ERROR\x10\x032\xba\x03\n" +
 	"\rGomokuService\x120\n" +
 	"\n" +
 	"PlayStream\x12\x10.pb.ClientAction\x1a\f.pb.GameSync(\x010\x01\x12-\n" +
 	"\bRegister\x12\x0f.pb.AuthRequest\x1a\x10.pb.AuthResponse\x12*\n" +
 	"\x05Login\x12\x0f.pb.AuthRequest\x1a\x10.pb.AuthResponse\x123\n" +
 	"\n" +
-	"QueueMatch\x12\x10.pb.QueueRequest\x1a\x11.pb.QueueResponse0\x01\x120\n" +
+	"QueueMatch\x12\x10.pb.QueueRequest\x1a\x11.pb.QueueResponse0\x01\x12B\n" +
+	"\x11CreatePrivateRoom\x12\x15.pb.CreateRoomRequest\x1a\x16.pb.CreateRoomResponse\x12;\n" +
+	"\x0fJoinPrivateRoom\x12\x13.pb.JoinRoomRequest\x1a\x11.pb.QueueResponse0\x01\x124\n" +
+	"\vCheckRejoin\x12\x11.pb.RejoinRequest\x1a\x12.pb.RejoinResponse\x120\n" +
 	"\n" +
 	"PlayOnline\x12\x10.pb.OnlineAction\x1a\f.pb.GameSync(\x010\x01B/Z-github.com/ttasc/gotermoku/internal/common/pbb\x06proto3"
 
@@ -695,39 +1084,50 @@ func file_api_proto_gomoku_proto_rawDescGZIP() []byte {
 }
 
 var file_api_proto_gomoku_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_api_proto_gomoku_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_api_proto_gomoku_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_api_proto_gomoku_proto_goTypes = []any{
-	(QueueStatus)(0),      // 0: pb.QueueStatus
-	(*BoardRow)(nil),      // 1: pb.BoardRow
-	(*Position)(nil),      // 2: pb.Position
-	(*ClientAction)(nil),  // 3: pb.ClientAction
-	(*GameSync)(nil),      // 4: pb.GameSync
-	(*AuthRequest)(nil),   // 5: pb.AuthRequest
-	(*AuthResponse)(nil),  // 6: pb.AuthResponse
-	(*QueueRequest)(nil),  // 7: pb.QueueRequest
-	(*QueueResponse)(nil), // 8: pb.QueueResponse
-	(*OnlineAction)(nil),  // 9: pb.OnlineAction
+	(QueueStatus)(0),           // 0: pb.QueueStatus
+	(*BoardRow)(nil),           // 1: pb.BoardRow
+	(*Position)(nil),           // 2: pb.Position
+	(*ClientAction)(nil),       // 3: pb.ClientAction
+	(*GameSync)(nil),           // 4: pb.GameSync
+	(*AuthRequest)(nil),        // 5: pb.AuthRequest
+	(*AuthResponse)(nil),       // 6: pb.AuthResponse
+	(*QueueRequest)(nil),       // 7: pb.QueueRequest
+	(*QueueResponse)(nil),      // 8: pb.QueueResponse
+	(*CreateRoomRequest)(nil),  // 9: pb.CreateRoomRequest
+	(*CreateRoomResponse)(nil), // 10: pb.CreateRoomResponse
+	(*JoinRoomRequest)(nil),    // 11: pb.JoinRoomRequest
+	(*RejoinRequest)(nil),      // 12: pb.RejoinRequest
+	(*RejoinResponse)(nil),     // 13: pb.RejoinResponse
+	(*OnlineAction)(nil),       // 14: pb.OnlineAction
 }
 var file_api_proto_gomoku_proto_depIdxs = []int32{
-	1, // 0: pb.GameSync.board:type_name -> pb.BoardRow
-	2, // 1: pb.GameSync.winning_positions:type_name -> pb.Position
-	0, // 2: pb.QueueResponse.status:type_name -> pb.QueueStatus
-	3, // 3: pb.OnlineAction.action:type_name -> pb.ClientAction
-	3, // 4: pb.GomokuService.PlayStream:input_type -> pb.ClientAction
-	5, // 5: pb.GomokuService.Register:input_type -> pb.AuthRequest
-	5, // 6: pb.GomokuService.Login:input_type -> pb.AuthRequest
-	7, // 7: pb.GomokuService.QueueMatch:input_type -> pb.QueueRequest
-	9, // 8: pb.GomokuService.PlayOnline:input_type -> pb.OnlineAction
-	4, // 9: pb.GomokuService.PlayStream:output_type -> pb.GameSync
-	6, // 10: pb.GomokuService.Register:output_type -> pb.AuthResponse
-	6, // 11: pb.GomokuService.Login:output_type -> pb.AuthResponse
-	8, // 12: pb.GomokuService.QueueMatch:output_type -> pb.QueueResponse
-	4, // 13: pb.GomokuService.PlayOnline:output_type -> pb.GameSync
-	9, // [9:14] is the sub-list for method output_type
-	4, // [4:9] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	1,  // 0: pb.GameSync.board:type_name -> pb.BoardRow
+	2,  // 1: pb.GameSync.winning_positions:type_name -> pb.Position
+	0,  // 2: pb.QueueResponse.status:type_name -> pb.QueueStatus
+	3,  // 3: pb.OnlineAction.action:type_name -> pb.ClientAction
+	3,  // 4: pb.GomokuService.PlayStream:input_type -> pb.ClientAction
+	5,  // 5: pb.GomokuService.Register:input_type -> pb.AuthRequest
+	5,  // 6: pb.GomokuService.Login:input_type -> pb.AuthRequest
+	7,  // 7: pb.GomokuService.QueueMatch:input_type -> pb.QueueRequest
+	9,  // 8: pb.GomokuService.CreatePrivateRoom:input_type -> pb.CreateRoomRequest
+	11, // 9: pb.GomokuService.JoinPrivateRoom:input_type -> pb.JoinRoomRequest
+	12, // 10: pb.GomokuService.CheckRejoin:input_type -> pb.RejoinRequest
+	14, // 11: pb.GomokuService.PlayOnline:input_type -> pb.OnlineAction
+	4,  // 12: pb.GomokuService.PlayStream:output_type -> pb.GameSync
+	6,  // 13: pb.GomokuService.Register:output_type -> pb.AuthResponse
+	6,  // 14: pb.GomokuService.Login:output_type -> pb.AuthResponse
+	8,  // 15: pb.GomokuService.QueueMatch:output_type -> pb.QueueResponse
+	10, // 16: pb.GomokuService.CreatePrivateRoom:output_type -> pb.CreateRoomResponse
+	8,  // 17: pb.GomokuService.JoinPrivateRoom:output_type -> pb.QueueResponse
+	13, // 18: pb.GomokuService.CheckRejoin:output_type -> pb.RejoinResponse
+	4,  // 19: pb.GomokuService.PlayOnline:output_type -> pb.GameSync
+	12, // [12:20] is the sub-list for method output_type
+	4,  // [4:12] is the sub-list for method input_type
+	4,  // [4:4] is the sub-list for extension type_name
+	4,  // [4:4] is the sub-list for extension extendee
+	0,  // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_api_proto_gomoku_proto_init() }
@@ -741,7 +1141,7 @@ func file_api_proto_gomoku_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_proto_gomoku_proto_rawDesc), len(file_api_proto_gomoku_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   9,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

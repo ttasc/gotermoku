@@ -8,7 +8,7 @@ option go_package = "github.com/ttasc/gotermoku/internal/common/pb";
 // ==========================================
 
 message BoardRow {
-    bytes cells = 1; // bytes ánh xạ trực tiếp 1-1 với []uint8 trong Go
+    bytes cells = 1; // bytes ánh xạ 1-1 với []uint8 trong Go
 }
 
 message Position {
@@ -25,12 +25,16 @@ message ClientAction {
 
 // Host / Server -> Client (Đồng bộ GameState)
 message GameSync {
-    string type = 1; // "sync", "disconnect", "error"
+    string type = 1; // "sync", "disconnect", "pause", "resume", "error"
     int32 current_turn = 2;
-    int32 winner = 3;
+    int32 winner = 3; // 0: Empty, 1: White, 2: Black, 3: Draw
     repeated BoardRow board = 4;
     repeated Position winning_positions = 5;
-    string message = 6; // Thông báo trạng thái (nếu có)
+    string message = 6;
+    bool is_paused = 7;                 // Trận đấu đang tạm dừng (chờ đối thủ reconnect)
+    int32 grace_seconds_remaining = 8; // Số giây còn lại của thời gian ân hạn
+    int32 white_elo = 9;
+    int32 black_elo = 10;
 }
 
 // ==========================================
@@ -46,14 +50,15 @@ message AuthResponse {
     bool success = 1;
     string message = 2;
     string token = 3;
+    int32 elo = 4;
 }
 
 // ==========================================
-// MATCHMAKING (Ghép trận)
+// MATCHMAKING & PRIVATE ROOMS
 // ==========================================
 
 message QueueRequest {
-    string token = 1;
+    // Token đã được chuyển sang gRPC Metadata Header ("authorization")
 }
 
 enum QueueStatus {
@@ -68,32 +73,75 @@ message QueueResponse {
     string message = 2;
     string match_id = 3;
     string opponent_name = 4;
-    int32 assigned_color = 5; // 1: White (đi trước), 2: Black (đi sau)
+    int32 assigned_color = 5; // 1: White, 2: Black
     int32 rows = 6;
     int32 cols = 7;
+    int32 opponent_elo = 8;
+    int32 your_elo = 9;
+    string room_code = 10;
+}
+
+message CreateRoomRequest {
+    int32 rows = 1;
+    int32 cols = 2;
+}
+
+message CreateRoomResponse {
+    bool success = 1;
+    string message = 2;
+    string room_code = 3;
+}
+
+message JoinRoomRequest {
+    string room_code = 1;
 }
 
 // ==========================================
-// ONLINE MATCH PLAY (Truyền nhận qua Central Server)
+// REJOIN & ONLINE MATCH PLAY
 // ==========================================
+
+message RejoinRequest {
+    string match_id = 1;
+}
+
+message RejoinResponse {
+    bool success = 1;
+    string message = 2;
+    string match_id = 3;
+    string opponent_name = 4;
+    int32 assigned_color = 5;
+    int32 rows = 6;
+    int32 cols = 7;
+    int32 opponent_elo = 8;
+    int32 your_elo = 9;
+}
 
 message OnlineAction {
-    string token = 1;
-    string match_id = 2;
-    ClientAction action = 3;
+    // Token đã được chuyển sang gRPC Metadata Header ("authorization")
+    string match_id = 1;
+    ClientAction action = 2;
 }
 
 // ==========================================
-// SERVICE UNIFIED (GomokuService duy nhất)
+// SERVICE UNIFIED
 // ==========================================
 
 service GomokuService {
-    // 1. Chế độ LAN P2P hiện hữu
+    // 1. Chế độ LAN P2P
     rpc PlayStream(stream ClientAction) returns (stream GameSync);
 
-    // 2. Chế độ Online qua Server trung tâm
+    // 2. Xác thực người dùng
     rpc Register(AuthRequest) returns (AuthResponse);
     rpc Login(AuthRequest) returns (AuthResponse);
+
+    // 3. Ghép trận tự động (Elo Matchmaking)
     rpc QueueMatch(QueueRequest) returns (stream QueueResponse);
+
+    // 4. Phòng riêng (Private Rooms)
+    rpc CreatePrivateRoom(CreateRoomRequest) returns (CreateRoomResponse);
+    rpc JoinPrivateRoom(JoinRoomRequest) returns (stream QueueResponse);
+
+    // 5. Trận đấu trực tuyến & Phục hồi kết nối
+    rpc CheckRejoin(RejoinRequest) returns (RejoinResponse);
     rpc PlayOnline(stream OnlineAction) returns (stream GameSync);
 }

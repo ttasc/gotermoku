@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/ttasc/gotermoku/internal/common/core"
 )
 
 const (
@@ -35,7 +37,6 @@ func NewRateLimiter(window time.Duration, maxHits int) *RateLimiter {
 		maxHits:  maxHits,
 	}
 
-	// Luồng ngầm dọn rác IP cũ sau mỗi 5 phút để tránh rò rỉ RAM
 	go func() {
 		ticker := time.NewTicker(5 * time.Minute)
 		for range ticker.C {
@@ -151,7 +152,7 @@ type AuthManager struct {
 func NewAuthManager(store *UserStore) *AuthManager {
 	return &AuthManager{
 		store:   store,
-		limiter: NewRateLimiter(10*time.Second, 5), // Tối đa 5 yêu cầu / 10s trên 1 IP
+		limiter: NewRateLimiter(10*time.Second, 5),
 		session: NewSessionStore(),
 	}
 }
@@ -181,6 +182,10 @@ func (a *AuthManager) Register(ip, username, password string) (string, error) {
 		PasswordHash: hash,
 		Salt:         salt,
 		CreatedAt:    time.Now(),
+		Elo:          core.DefaultElo,
+		Wins:         0,
+		Losses:       0,
+		Draws:        0,
 	}
 
 	if err := a.store.Create(user); err != nil {
@@ -201,7 +206,6 @@ func (a *AuthManager) Login(ip, username, password string) (string, error) {
 	}
 
 	expectedHash := computeHash(password, user.Salt)
-	// So sánh thời gian hằng số (Constant Time Compare) để chống timing attack
 	if subtle.ConstantTimeCompare([]byte(expectedHash), []byte(user.PasswordHash)) != 1 {
 		return "", errors.New("invalid username or password")
 	}
@@ -213,13 +217,20 @@ func (a *AuthManager) ValidateToken(token string) (string, bool) {
 	return a.session.Validate(token)
 }
 
+func (a *AuthManager) GetUser(username string) (*User, bool) {
+	return a.store.Get(username)
+}
+
+func (a *AuthManager) UpdateStats(username string, newElo int, won, lost, drew bool) error {
+	return a.store.UpdateStats(username, newElo, won, lost, drew)
+}
+
 func computeHash(password, salt string) string {
 	h := sha256.New()
 	h.Write([]byte(salt))
 	h.Write([]byte(password))
 	digest := h.Sum(nil)
 
-	// Lặp 50,000 vòng SHA-256 để tăng chi phí tính toán cho kẻ tấn công
 	for i := 0; i < hashIterations; i++ {
 		h.Reset()
 		h.Write(digest)

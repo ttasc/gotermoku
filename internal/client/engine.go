@@ -7,7 +7,6 @@ import (
 	"github.com/ttasc/ttbox"
 )
 
-// RunEngine thống nhất vòng lặp sự kiện của tất cả các chế độ
 func RunEngine(cfg *Config, state *core.GameState, t Transport) {
 	opts := buildRenderOpts(cfg)
 
@@ -46,7 +45,7 @@ func RunEngine(cfg *Config, state *core.GameState, t Transport) {
 			if intent.Action == ActionQuit {
 				break
 			}
-			processIntent(cfg, intent, state, t)
+			processIntent(cfg, intent, state, t, opts)
 		}
 
 		Render(state, opts)
@@ -54,7 +53,16 @@ func RunEngine(cfg *Config, state *core.GameState, t Transport) {
 }
 
 func buildRenderOpts(cfg *Config) RenderOpts {
-	opts := RenderOpts{LocalColor: core.Empty, OppName: ""}
+	opts := RenderOpts{
+		LocalColor:   core.Empty,
+		OppName:      "",
+		RoomCode:     cfg.RoomCode,
+		YourElo:      cfg.YourElo,
+		OppElo:       cfg.OpponentElo,
+		IsPaused:     false,
+		GraceSeconds: 0,
+	}
+
 	if cfg.IsBotMode {
 		opts.LocalColor = core.White
 		opts.OppName = "Bot"
@@ -78,14 +86,48 @@ func processNetwork(cfg *Config, state *core.GameState, t Transport, opts *Rende
 	select {
 	case msg := <-t.Receive():
 		if msg.Type == "disconnect" {
-			if cfg.IsCentralMode {
+			opts.IsPaused = false
+			if msg.Message != "" {
+				opts.DisconnectMsg = msg.Message
+			} else if cfg.IsCentralMode {
 				opts.DisconnectMsg = "Opponent disconnected from server."
 			} else if cfg.IsHost {
 				opts.DisconnectMsg = "Opponent disconnected."
 			} else {
 				opts.DisconnectMsg = "Host disconnected."
 			}
+		} else if msg.Type == "pause" {
+			opts.IsPaused = true
+			opts.GraceSeconds = msg.GraceSecondsRemaining
+			opts.PauseMsg = msg.Message
+		} else if msg.Type == "resume" {
+			opts.IsPaused = false
+			opts.PauseMsg = ""
+			// Khôi phục ma trận bàn cờ cho client vừa kết nối lại
+			if len(msg.Board) > 0 && !cfg.IsHost {
+				state.Board = msg.Board
+				state.Rows = len(msg.Board)
+				state.Cols = len(msg.Board[0])
+				state.CurrentTurn = msg.CurrentTurn
+				state.Winner = msg.Winner
+				state.WinningPositions = msg.WinningPositions
+			}
 		} else if msg.Type == "sync" && !cfg.IsHost {
+			opts.IsPaused = msg.IsPaused
+			opts.GraceSeconds = msg.GraceSecondsRemaining
+			if !msg.IsPaused {
+				opts.PauseMsg = ""
+			}
+			if msg.WhiteElo > 0 && msg.BlackElo > 0 {
+				if cfg.AssignedColor == core.White {
+					opts.YourElo = msg.WhiteElo
+					opts.OppElo = msg.BlackElo
+				} else {
+					opts.YourElo = msg.BlackElo
+					opts.OppElo = msg.WhiteElo
+				}
+			}
+
 			state.Board = msg.Board
 			state.Rows = len(msg.Board)
 			if state.Rows > 0 {
@@ -107,7 +149,12 @@ func processNetwork(cfg *Config, state *core.GameState, t Transport, opts *Rende
 	}
 }
 
-func processIntent(cfg *Config, intent InputIntent, state *core.GameState, t Transport) {
+func processIntent(cfg *Config, intent InputIntent, state *core.GameState, t Transport, opts RenderOpts) {
+	// Khóa không cho phép đánh cờ khi trận đấu đang tạm dừng (Grace Period)
+	if opts.IsPaused && intent.Action == ActionPlace {
+		return
+	}
+
 	if intent.Action == ActionRestart && state.Winner != core.Empty {
 		if cfg.IsOnline && !cfg.IsHost {
 			t.Send(NetMessage{Type: "restart"})

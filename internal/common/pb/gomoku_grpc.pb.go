@@ -21,23 +21,32 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	GomokuService_PlayStream_FullMethodName = "/pb.GomokuService/PlayStream"
-	GomokuService_Register_FullMethodName   = "/pb.GomokuService/Register"
-	GomokuService_Login_FullMethodName      = "/pb.GomokuService/Login"
-	GomokuService_QueueMatch_FullMethodName = "/pb.GomokuService/QueueMatch"
-	GomokuService_PlayOnline_FullMethodName = "/pb.GomokuService/PlayOnline"
+	GomokuService_PlayStream_FullMethodName        = "/pb.GomokuService/PlayStream"
+	GomokuService_Register_FullMethodName          = "/pb.GomokuService/Register"
+	GomokuService_Login_FullMethodName             = "/pb.GomokuService/Login"
+	GomokuService_QueueMatch_FullMethodName        = "/pb.GomokuService/QueueMatch"
+	GomokuService_CreatePrivateRoom_FullMethodName = "/pb.GomokuService/CreatePrivateRoom"
+	GomokuService_JoinPrivateRoom_FullMethodName   = "/pb.GomokuService/JoinPrivateRoom"
+	GomokuService_CheckRejoin_FullMethodName       = "/pb.GomokuService/CheckRejoin"
+	GomokuService_PlayOnline_FullMethodName        = "/pb.GomokuService/PlayOnline"
 )
 
 // GomokuServiceClient is the client API for GomokuService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type GomokuServiceClient interface {
-	// 1. Chế độ LAN P2P hiện hữu
+	// 1. Chế độ LAN P2P
 	PlayStream(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ClientAction, GameSync], error)
-	// 2. Chế độ Online qua Server trung tâm
+	// 2. Xác thực người dùng
 	Register(ctx context.Context, in *AuthRequest, opts ...grpc.CallOption) (*AuthResponse, error)
 	Login(ctx context.Context, in *AuthRequest, opts ...grpc.CallOption) (*AuthResponse, error)
+	// 3. Ghép trận tự động (Elo Matchmaking)
 	QueueMatch(ctx context.Context, in *QueueRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[QueueResponse], error)
+	// 4. Phòng riêng (Private Rooms)
+	CreatePrivateRoom(ctx context.Context, in *CreateRoomRequest, opts ...grpc.CallOption) (*CreateRoomResponse, error)
+	JoinPrivateRoom(ctx context.Context, in *JoinRoomRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[QueueResponse], error)
+	// 5. Trận đấu trực tuyến & Phục hồi kết nối
+	CheckRejoin(ctx context.Context, in *RejoinRequest, opts ...grpc.CallOption) (*RejoinResponse, error)
 	PlayOnline(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[OnlineAction, GameSync], error)
 }
 
@@ -101,9 +110,48 @@ func (c *gomokuServiceClient) QueueMatch(ctx context.Context, in *QueueRequest, 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type GomokuService_QueueMatchClient = grpc.ServerStreamingClient[QueueResponse]
 
+func (c *gomokuServiceClient) CreatePrivateRoom(ctx context.Context, in *CreateRoomRequest, opts ...grpc.CallOption) (*CreateRoomResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateRoomResponse)
+	err := c.cc.Invoke(ctx, GomokuService_CreatePrivateRoom_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gomokuServiceClient) JoinPrivateRoom(ctx context.Context, in *JoinRoomRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[QueueResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &GomokuService_ServiceDesc.Streams[2], GomokuService_JoinPrivateRoom_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[JoinRoomRequest, QueueResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type GomokuService_JoinPrivateRoomClient = grpc.ServerStreamingClient[QueueResponse]
+
+func (c *gomokuServiceClient) CheckRejoin(ctx context.Context, in *RejoinRequest, opts ...grpc.CallOption) (*RejoinResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RejoinResponse)
+	err := c.cc.Invoke(ctx, GomokuService_CheckRejoin_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *gomokuServiceClient) PlayOnline(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[OnlineAction, GameSync], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &GomokuService_ServiceDesc.Streams[2], GomokuService_PlayOnline_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &GomokuService_ServiceDesc.Streams[3], GomokuService_PlayOnline_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -118,12 +166,18 @@ type GomokuService_PlayOnlineClient = grpc.BidiStreamingClient[OnlineAction, Gam
 // All implementations must embed UnimplementedGomokuServiceServer
 // for forward compatibility.
 type GomokuServiceServer interface {
-	// 1. Chế độ LAN P2P hiện hữu
+	// 1. Chế độ LAN P2P
 	PlayStream(grpc.BidiStreamingServer[ClientAction, GameSync]) error
-	// 2. Chế độ Online qua Server trung tâm
+	// 2. Xác thực người dùng
 	Register(context.Context, *AuthRequest) (*AuthResponse, error)
 	Login(context.Context, *AuthRequest) (*AuthResponse, error)
+	// 3. Ghép trận tự động (Elo Matchmaking)
 	QueueMatch(*QueueRequest, grpc.ServerStreamingServer[QueueResponse]) error
+	// 4. Phòng riêng (Private Rooms)
+	CreatePrivateRoom(context.Context, *CreateRoomRequest) (*CreateRoomResponse, error)
+	JoinPrivateRoom(*JoinRoomRequest, grpc.ServerStreamingServer[QueueResponse]) error
+	// 5. Trận đấu trực tuyến & Phục hồi kết nối
+	CheckRejoin(context.Context, *RejoinRequest) (*RejoinResponse, error)
 	PlayOnline(grpc.BidiStreamingServer[OnlineAction, GameSync]) error
 	mustEmbedUnimplementedGomokuServiceServer()
 }
@@ -146,6 +200,15 @@ func (UnimplementedGomokuServiceServer) Login(context.Context, *AuthRequest) (*A
 }
 func (UnimplementedGomokuServiceServer) QueueMatch(*QueueRequest, grpc.ServerStreamingServer[QueueResponse]) error {
 	return status.Error(codes.Unimplemented, "method QueueMatch not implemented")
+}
+func (UnimplementedGomokuServiceServer) CreatePrivateRoom(context.Context, *CreateRoomRequest) (*CreateRoomResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreatePrivateRoom not implemented")
+}
+func (UnimplementedGomokuServiceServer) JoinPrivateRoom(*JoinRoomRequest, grpc.ServerStreamingServer[QueueResponse]) error {
+	return status.Error(codes.Unimplemented, "method JoinPrivateRoom not implemented")
+}
+func (UnimplementedGomokuServiceServer) CheckRejoin(context.Context, *RejoinRequest) (*RejoinResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CheckRejoin not implemented")
 }
 func (UnimplementedGomokuServiceServer) PlayOnline(grpc.BidiStreamingServer[OnlineAction, GameSync]) error {
 	return status.Error(codes.Unimplemented, "method PlayOnline not implemented")
@@ -225,6 +288,53 @@ func _GomokuService_QueueMatch_Handler(srv interface{}, stream grpc.ServerStream
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type GomokuService_QueueMatchServer = grpc.ServerStreamingServer[QueueResponse]
 
+func _GomokuService_CreatePrivateRoom_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateRoomRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GomokuServiceServer).CreatePrivateRoom(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GomokuService_CreatePrivateRoom_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GomokuServiceServer).CreatePrivateRoom(ctx, req.(*CreateRoomRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GomokuService_JoinPrivateRoom_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(JoinRoomRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(GomokuServiceServer).JoinPrivateRoom(m, &grpc.GenericServerStream[JoinRoomRequest, QueueResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type GomokuService_JoinPrivateRoomServer = grpc.ServerStreamingServer[QueueResponse]
+
+func _GomokuService_CheckRejoin_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RejoinRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GomokuServiceServer).CheckRejoin(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GomokuService_CheckRejoin_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GomokuServiceServer).CheckRejoin(ctx, req.(*RejoinRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _GomokuService_PlayOnline_Handler(srv interface{}, stream grpc.ServerStream) error {
 	return srv.(GomokuServiceServer).PlayOnline(&grpc.GenericServerStream[OnlineAction, GameSync]{ServerStream: stream})
 }
@@ -247,6 +357,14 @@ var GomokuService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "Login",
 			Handler:    _GomokuService_Login_Handler,
 		},
+		{
+			MethodName: "CreatePrivateRoom",
+			Handler:    _GomokuService_CreatePrivateRoom_Handler,
+		},
+		{
+			MethodName: "CheckRejoin",
+			Handler:    _GomokuService_CheckRejoin_Handler,
+		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
@@ -258,6 +376,11 @@ var GomokuService_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "QueueMatch",
 			Handler:       _GomokuService_QueueMatch_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "JoinPrivateRoom",
+			Handler:       _GomokuService_JoinPrivateRoom_Handler,
 			ServerStreams: true,
 		},
 		{

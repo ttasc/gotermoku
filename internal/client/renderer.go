@@ -37,6 +37,12 @@ type RenderOpts struct {
 	LocalColor    uint8
 	OppName       string
 	DisconnectMsg string
+	RoomCode      string
+	YourElo       int
+	OppElo        int
+	IsPaused      bool
+	GraceSeconds  int
+	PauseMsg      string
 }
 
 func InitUI(rows, cols int) {
@@ -70,6 +76,8 @@ func Render(state *core.GameState, opts RenderOpts) {
 
 	if state.Winner != core.Empty {
 		drawEndgameBanner(state)
+	} else if opts.IsPaused {
+		drawPauseBanner(opts)
 	} else if opts.DisconnectMsg != "" {
 		drawDisconnectBanner(opts.DisconnectMsg)
 	} else {
@@ -142,7 +150,11 @@ func drawStatusline(state *core.GameState, opts RenderOpts) {
 
 	y := max((h-state.Rows)/2-2, 0)
 	if y != 0 {
-		ttbox.DrawTextCenter(1, " G O T E R M O K U ", ColorText, ColorDefault)
+		title := " G O T E R M O K U "
+		if opts.RoomCode != "" {
+			title = fmt.Sprintf(" G O T E R M O K U  [ROOM: %s] ", opts.RoomCode)
+		}
+		ttbox.DrawTextCenter(1, title, ColorText, ColorDefault)
 	}
 
 	drawTimer(state, w, y, opts)
@@ -174,9 +186,27 @@ func getPlayerLabels(opts RenderOpts) (string, string) {
 	wLabel, bLabel := " WHITE ", " BLACK "
 	if opts.OppName != "" {
 		if opts.LocalColor == core.White {
-			wLabel, bLabel = " WHITE (You) ", fmt.Sprintf(" BLACK (%s) ", opts.OppName)
+			wStr := "You"
+			if opts.YourElo > 0 {
+				wStr = fmt.Sprintf("You - %d", opts.YourElo)
+			}
+			bStr := opts.OppName
+			if opts.OppElo > 0 {
+				bStr = fmt.Sprintf("%s - %d", opts.OppName, opts.OppElo)
+			}
+			wLabel = fmt.Sprintf(" WHITE (%s) ", wStr)
+			bLabel = fmt.Sprintf(" BLACK (%s) ", bStr)
 		} else if opts.LocalColor == core.Black {
-			wLabel, bLabel = fmt.Sprintf(" WHITE (%s) ", opts.OppName), " BLACK (You) "
+			wStr := opts.OppName
+			if opts.OppElo > 0 {
+				wStr = fmt.Sprintf("%s - %d", opts.OppName, opts.OppElo)
+			}
+			bStr := "You"
+			if opts.YourElo > 0 {
+				bStr = fmt.Sprintf("You - %d", opts.YourElo)
+			}
+			wLabel = fmt.Sprintf(" WHITE (%s) ", wStr)
+			bLabel = fmt.Sprintf(" BLACK (%s) ", bStr)
 		}
 	}
 	return fmt.Sprintf(" %c -%s", CharWhite, wLabel), fmt.Sprintf(" %c -%s", CharBlack, bLabel)
@@ -193,7 +223,7 @@ func getPlayerColors(state *core.GameState) (int, int, int, int) {
 }
 
 func drawTurnIndicator(state *core.GameState, opts RenderOpts, y int) {
-	if opts.OppName == "" || state.Winner != core.Empty {
+	if opts.OppName == "" || state.Winner != core.Empty || opts.IsPaused {
 		return
 	}
 
@@ -216,14 +246,37 @@ func drawControlsGuide() {
 
 func drawEndgameBanner(state *core.GameState) {
 	_, h := ttbox.Size()
-	msg := " * WHITE WINS! * "
-	if state.Winner == core.Black {
+
+	var msg string
+	color := ColorWin
+
+	switch state.Winner {
+	case core.Draw:
+		msg = " * MATCH DRAW! (BOARD FULL) * "
+		color = ColorSelValid
+	case core.White:
+		msg = " * WHITE WINS! * "
+	case core.Black:
 		msg = " * BLACK WINS! * "
 	}
+
 	ttbox.SetAttr(true, false, false, false)
-	ttbox.DrawTextCenter(h-2, msg, ColorWin, ColorDefault)
+	ttbox.DrawTextCenter(h-2, msg, color, ColorDefault)
 	ttbox.ResetAttr()
 	ttbox.DrawTextCenter(h-1, " [R] Play Again   [ESC] Exit ", ColorTextDim, ColorDefault)
+}
+
+func drawPauseBanner(opts RenderOpts) {
+	_, h := ttbox.Size()
+	msg := fmt.Sprintf(" * OPPONENT DISCONNECTED - WAITING FOR RECONNECT (%ds) * ", opts.GraceSeconds)
+	if opts.PauseMsg != "" {
+		msg = fmt.Sprintf(" * %s * ", opts.PauseMsg)
+	}
+
+	ttbox.SetAttr(true, false, false, false)
+	ttbox.DrawTextCenter(h-2, msg, ColorSelInvalid, ColorDefault)
+	ttbox.ResetAttr()
+	ttbox.DrawTextCenter(h-1, " Game is paused. Match will automatically resume once reconnected. ", ColorTextDim, ColorDefault)
 }
 
 func drawDisconnectBanner(msg string) {

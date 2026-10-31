@@ -11,13 +11,18 @@ type Transport interface {
 }
 
 type NetMessage struct {
-	Type             string // "sync", "move", "restart", "disconnect"
-	X                int
-	Y                int
-	Board            [][]uint8
-	CurrentTurn      uint8
-	Winner           uint8
-	WinningPositions [][2]int
+	Type                  string // "sync", "move", "restart", "disconnect", "pause", "resume"
+	X                     int
+	Y                     int
+	Board                 [][]uint8
+	CurrentTurn           uint8
+	Winner                uint8
+	WinningPositions      [][2]int
+	Message               string
+	IsPaused              bool
+	GraceSecondsRemaining int
+	WhiteElo              int
+	BlackElo              int
 }
 
 func BroadcastSync(state *core.GameState, t Transport) {

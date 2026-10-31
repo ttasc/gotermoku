@@ -23,6 +23,16 @@ type Config struct {
 	IsCentralMode bool
 	AssignedColor uint8
 	OpponentName  string
+	// Tính năng mới
+	IsCreateRoom  bool
+	JoinRoomCode  string
+	RejoinMatchID string
+	EnableTLS     bool
+	CACertFile    string
+	YourElo       int
+	OpponentElo   int
+	RoomCode      string
+	OnRoomCreated func(code string) // Callback thông báo mã phòng an toàn đa luồng
 }
 
 func parseDimensions(sizeStr string) (int, int, error) {
@@ -51,10 +61,18 @@ func ParseConfig(args []string) *Config {
 	sizeStr := fs.String("size", "20x30", "")
 	sizeShorthand := fs.String("s", "20x30", "")
 
+	// Central Server
 	serverAddr := fs.String("server", "", "")
 	username := fs.String("user", "", "")
 	password := fs.String("pass", "", "")
 	registerFlag := fs.Bool("register", false, "")
+
+	// Private Rooms, Rejoin & TLS
+	createRoom := fs.Bool("create-room", false, "")
+	joinRoom := fs.String("join-room", "", "")
+	rejoin := fs.String("rejoin", "", "")
+	enableTLS := fs.Bool("tls", false, "")
+	caCert := fs.String("ca-cert", "", "")
 
 	if err := fs.Parse(args); err != nil {
 		fmt.Printf("Error: %v\n", err)
@@ -77,6 +95,10 @@ func ParseConfig(args []string) *Config {
 	}
 	if *hostFlag && *joinAddr != "" {
 		fmt.Println("Error: cannot use both --host and --join")
+		os.Exit(1)
+	}
+	if (*createRoom || *joinRoom != "" || *rejoin != "") && !isCentral {
+		fmt.Println("Error: --create-room, --join-room, and --rejoin require --server")
 		os.Exit(1)
 	}
 
@@ -104,20 +126,30 @@ func ParseConfig(args []string) *Config {
 		Password:      *password,
 		IsRegister:    *registerFlag,
 		IsCentralMode: isCentral,
+		IsCreateRoom:  *createRoom,
+		JoinRoomCode:  strings.ToUpper(strings.TrimSpace(*joinRoom)),
+		RejoinMatchID: strings.TrimSpace(*rejoin),
+		EnableTLS:     *enableTLS,
+		CACertFile:    *caCert,
 	}
 }
 
 func printUsage() {
 	fmt.Println("Gomoku TUI Game\nUsage:\n  gotermoku [options]\nOptions:")
-	fmt.Println("  -h, --help          Show this help message")
-	fmt.Println("  -s, --size          Specify board size as ROWSxCOLS (default: 20x30, min: 3x3)")
-	fmt.Println("  --bot               Play against AI in offline mode")
-	fmt.Println("  --host              Enable online mode and act as Host (LAN P2P)")
-	fmt.Println("  --join ADDRESS      Enable online mode and connect to Host (LAN P2P)")
-	fmt.Println("  --port PORT         Specify port for LAN P2P (default: 3333)")
+	fmt.Println("  -h, --help           Show this help message")
+	fmt.Println("  -s, --size           Specify board size as ROWSxCOLS (default: 20x30, min: 3x3)")
+	fmt.Println("  --bot                Play against AI in offline mode")
+	fmt.Println("  --host               Enable online mode and act as Host (LAN P2P)")
+	fmt.Println("  --join ADDRESS       Enable online mode and connect to Host (LAN P2P)")
+	fmt.Println("  --port PORT          Specify port for LAN P2P (default: 3333)")
 	fmt.Println("\nCentral Server Online Options:")
-	fmt.Println("  --server HOST:PORT  Connect to Central Server for online matchmaking")
-	fmt.Println("  --user USERNAME     Account username")
-	fmt.Println("  --pass PASSWORD     Account password")
-	fmt.Println("  --register          Register account instead of login")
+	fmt.Println("  --server HOST:PORT   Connect to Central Server for online play")
+	fmt.Println("  --user USERNAME      Account username")
+	fmt.Println("  --pass PASSWORD      Account password")
+	fmt.Println("  --register           Register account instead of login")
+	fmt.Println("  --tls                Enable TLS encryption")
+	fmt.Println("  --ca-cert PATH       Path to trusted CA certificate file")
+	fmt.Println("  --create-room        Create a private game room with a shareable code")
+	fmt.Println("  --join-room CODE     Join a private game room using its code")
+	fmt.Println("  --rejoin MATCH_ID    Reconnect to an ongoing paused match")
 }
