@@ -7,11 +7,11 @@ all: client server
 
 client:
 	@echo "Building gotermoku client..."
-	go build -o gotermoku ./cmd/gotermoku
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o gotermoku ./cmd/gotermoku
 
 server:
 	@echo "Building gotermoku-server..."
-	go build -o gotermoku-server ./cmd/gotermoku-server
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o gotermoku-server ./cmd/gotermoku-server
 
 test:
 	@echo "Running integration tests with race detector..."

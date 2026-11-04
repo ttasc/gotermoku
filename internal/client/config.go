@@ -3,6 +3,7 @@ package client
 import (
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -23,16 +24,17 @@ type Config struct {
 	IsCentralMode bool
 	AssignedColor uint8
 	OpponentName  string
-	// Tính năng mới
+	// Tính năng phòng riêng & bảo mật
 	IsCreateRoom  bool
 	JoinRoomCode  string
 	RejoinMatchID string
 	EnableTLS     bool
+	TLSInsecure   bool // Bỏ qua xác minh chứng chỉ (dành cho self-signed certs)
 	CACertFile    string
 	YourElo       int
 	OpponentElo   int
 	RoomCode      string
-	OnRoomCreated func(code string) // Callback thông báo mã phòng an toàn đa luồng
+	OnRoomCreated func(code string)
 }
 
 func parseDimensions(sizeStr string) (int, int, error) {
@@ -46,6 +48,26 @@ func parseDimensions(sizeStr string) (int, int, error) {
 		return 0, 0, fmt.Errorf("invalid dimensions. Minimum size is 3x3")
 	}
 	return rows, cols, nil
+}
+
+func formatServerAddr(addr string) string {
+	addr = strings.TrimSpace(addr)
+	if addr == "" {
+		return ""
+	}
+
+	// Nếu đã có cổng (VD: localhost:5555 hoặc [::1]:5555), giữ nguyên
+	if _, _, err := net.SplitHostPort(addr); err == nil {
+		return addr
+	}
+
+	// Nếu là địa chỉ IPv6 thuần không có ngoặc vuông (VD: ::1)
+	if strings.Contains(addr, ":") && !strings.HasPrefix(addr, "[") {
+		return "[" + addr + "]:3333"
+	}
+
+	// Gắn cổng mặc định 3333 cho hostname hoặc IPv4
+	return addr + ":3333"
 }
 
 func ParseConfig(args []string) *Config {
@@ -72,6 +94,7 @@ func ParseConfig(args []string) *Config {
 	joinRoom := fs.String("join-room", "", "")
 	rejoin := fs.String("rejoin", "", "")
 	enableTLS := fs.Bool("tls", false, "")
+	tlsInsecure := fs.Bool("tls-insecure", false, "")
 	caCert := fs.String("ca-cert", "", "")
 
 	if err := fs.Parse(args); err != nil {
@@ -121,7 +144,7 @@ func ParseConfig(args []string) *Config {
 		IsBotMode:     *botFlag,
 		JoinAddr:      *joinAddr,
 		Port:          *port,
-		ServerAddr:    *serverAddr,
+		ServerAddr:    formatServerAddr(*serverAddr),
 		Username:      *username,
 		Password:      *password,
 		IsRegister:    *registerFlag,
@@ -129,7 +152,8 @@ func ParseConfig(args []string) *Config {
 		IsCreateRoom:  *createRoom,
 		JoinRoomCode:  strings.ToUpper(strings.TrimSpace(*joinRoom)),
 		RejoinMatchID: strings.TrimSpace(*rejoin),
-		EnableTLS:     *enableTLS,
+		EnableTLS:     *enableTLS || *tlsInsecure, // Bật --tls-insecure tự động kích hoạt mã hóa TLS
+		TLSInsecure:   *tlsInsecure,
 		CACertFile:    *caCert,
 	}
 }
@@ -143,11 +167,12 @@ func printUsage() {
 	fmt.Println("  --join ADDRESS       Enable online mode and connect to Host (LAN P2P)")
 	fmt.Println("  --port PORT          Specify port for LAN P2P (default: 3333)")
 	fmt.Println("\nCentral Server Online Options:")
-	fmt.Println("  --server HOST:PORT   Connect to Central Server for online play")
+	fmt.Println("  --server HOST[:PORT] Connect to Central Server (default port: 3333)")
 	fmt.Println("  --user USERNAME      Account username")
 	fmt.Println("  --pass PASSWORD      Account password")
 	fmt.Println("  --register           Register account instead of login")
-	fmt.Println("  --tls                Enable TLS encryption")
+	fmt.Println("  --tls                Enable TLS encryption (uses system Root CAs by default)")
+	fmt.Println("  --tls-insecure       Enable TLS but skip CA verification (for self-signed certs / LAN)")
 	fmt.Println("  --ca-cert PATH       Path to trusted CA certificate file")
 	fmt.Println("  --create-room        Create a private game room with a shareable code")
 	fmt.Println("  --join-room CODE     Join a private game room using its code")

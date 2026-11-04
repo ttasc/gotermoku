@@ -1,8 +1,15 @@
 package server
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"flag"
 	"fmt"
+	"math/big"
 	"net"
 	"os"
 	"os/signal"
@@ -19,15 +26,15 @@ import (
 // Run khởi động và điều phối toàn bộ vòng đời của Central Server
 func Run(args []string) {
 	fs := flag.NewFlagSet("gotermoku-server", flag.ExitOnError)
-	port := fs.String("port", "4444", "TCP port for central server")
+	port := fs.String("port", "3333", "TCP port for central server")
 	dbPath := fs.String("db", "gotermoku.db", "Path to bbolt database file")
 	rows := fs.Int("rows", 20, "Default board rows for online matches")
 	cols := fs.Int("cols", 30, "Default board cols for online matches")
 
 	// Cờ cấu hình bảo mật TLS
 	enableTLS := fs.Bool("tls", false, "Enable TLS encryption")
-	certFile := fs.String("cert", "cert.pem", "Path to TLS certificate file")
-	keyFile := fs.String("key", "key.pem", "Path to TLS private key file")
+	certFile := fs.String("cert", "", "Path to TLS certificate file (optional)")
+	keyFile := fs.String("key", "", "Path to TLS private key file (optional)")
 
 	if err := fs.Parse(args); err != nil {
 		fmt.Fprintf(os.Stderr, "Error parsing server flags: %v\n", err)
@@ -57,14 +64,14 @@ func Run(args []string) {
 		os.Exit(1)
 	}
 
-	// 4. Cấu hình gRPC Keepalive & HTTP/2 Ping (Phát hiện rớt mạng tầng transport)
+	// 4. Cấu hình gRPC Keepalive & HTTP/2 Ping
 	kaParams := keepalive.ServerParameters{
 		MaxConnectionIdle: 5 * time.Minute,
 		Time:              10 * time.Second, // Gửi HTTP/2 Ping sau 10s không có dữ liệu
 		Timeout:           3 * time.Second,  // Chờ tối đa 3s nhận Ping ACK
 	}
 	kaPolicy := keepalive.EnforcementPolicy{
-		MinTime:             5 * time.Second,
+		MinTime:             1 * time.Second,
 		PermitWithoutStream: true,
 	}
 
@@ -75,16 +82,29 @@ func Run(args []string) {
 		grpc.StreamInterceptor(StreamAuthInterceptor(authMgr)),
 	}
 
-	// 5. Cấu hình TLS (nếu bật)
+	// 5. Cấu hình TLS (Hỗ trợ nạp từ file hoặc tự động sinh trong RAM)
 	if *enableTLS {
-		creds, err := credentials.NewServerTLSFromFile(*certFile, *keyFile)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error loading TLS certificates: %v\n", err)
-			_ = userStore.Close()
-			os.Exit(1)
+		if *certFile != "" && *keyFile != "" {
+			// Nạp chứng chỉ chính thức từ file đĩa (Production / Let's Encrypt)
+			creds, err := credentials.NewServerTLSFromFile(*certFile, *keyFile)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error loading TLS certificates: %v\n", err)
+				_ = userStore.Close()
+				os.Exit(1)
+			}
+			serverOpts = append(serverOpts, grpc.Creds(creds))
+			fmt.Printf("[SECURITY] TLS enabled (Loaded from %s, %s).\n", *certFile, *keyFile)
+		} else {
+			// Tự động sinh chứng chỉ ECDSA tạm thời trong RAM (Zero-Config TLS)
+			tlsCert, err := generateEphemeralCertificate()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error generating in-memory TLS certificate: %v\n", err)
+				_ = userStore.Close()
+				os.Exit(1)
+			}
+			serverOpts = append(serverOpts, grpc.Creds(credentials.NewServerTLSFromCert(&tlsCert)))
+			fmt.Println("[SECURITY] TLS enabled (Zero-Config: Generated ephemeral ECDSA certificate in-memory).")
 		}
-		serverOpts = append(serverOpts, grpc.Creds(creds))
-		fmt.Println("[SECURITY] TLS encryption enabled.")
 	} else {
 		fmt.Println("[SECURITY] Running in plaintext mode (insecure).")
 	}
@@ -111,4 +131,43 @@ func Run(args []string) {
 		_ = userStore.Close()
 		os.Exit(1)
 	}
+}
+
+// generateEphemeralCertificate tự sinh cặp khóa và chứng chỉ ECDSA P-256 trực tiếp trong RAM
+func generateEphemeralCertificate() (tls.Certificate, error) {
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return tls.Certificate{}, fmt.Errorf("failed to generate ecdsa key: %w", err)
+	}
+
+	serialLimit := new(big.Int).Lsh(big.NewInt(1), 128)
+	serialNumber, err := rand.Int(rand.Reader, serialLimit)
+	if err != nil {
+		return tls.Certificate{}, fmt.Errorf("failed to generate serial: %w", err)
+	}
+
+	template := x509.Certificate{
+		SerialNumber: serialNumber,
+		Subject: pkix.Name{
+			Organization: []string{"Gotermoku In-Memory Server"},
+			CommonName:   "localhost",
+		},
+		NotBefore:             time.Now().Add(-1 * time.Hour),
+		NotAfter:              time.Now().Add(365 * 24 * time.Hour),
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+		DNSNames:              []string{"localhost"},
+		IPAddresses:           []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("::1")},
+	}
+
+	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
+	if err != nil {
+		return tls.Certificate{}, fmt.Errorf("failed to create certificate: %w", err)
+	}
+
+	return tls.Certificate{
+		Certificate: [][]byte{derBytes},
+		PrivateKey:  priv,
+	}, nil
 }

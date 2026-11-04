@@ -92,8 +92,9 @@ func (t *centralTransport) readLoop() {
 func ConnectCentral(cfg *Config) (*CentralSession, error) {
 	fmt.Printf("[NET] Connecting to Central Server at %s...\n", cfg.ServerAddr)
 
+	// 1. Cấu hình bảo mật TLS: Hỗ trợ CA tùy chọn, System Root CA hoặc --tls-insecure
 	var creds credentials.TransportCredentials
-	if cfg.EnableTLS {
+	if cfg.EnableTLS || cfg.TLSInsecure {
 		if cfg.CACertFile != "" {
 			var err error
 			creds, err = credentials.NewClientTLSFromFile(cfg.CACertFile, "")
@@ -101,12 +102,13 @@ func ConnectCentral(cfg *Config) (*CentralSession, error) {
 				return nil, fmt.Errorf("failed to load CA certificate: %w", err)
 			}
 		} else {
-			creds = credentials.NewTLS(&tls.Config{InsecureSkipVerify: false})
+			creds = credentials.NewTLS(&tls.Config{InsecureSkipVerify: cfg.TLSInsecure})
 		}
 	} else {
 		creds = insecure.NewCredentials()
 	}
 
+	// 2. Cấu hình gRPC Keepalive (HTTP/2 PING)
 	kaParams := keepalive.ClientParameters{
 		Time:                10 * time.Second,
 		Timeout:             3 * time.Second,
@@ -124,6 +126,7 @@ func ConnectCentral(cfg *Config) (*CentralSession, error) {
 	client := pb.NewGomokuServiceClient(conn)
 	ctx := context.Background()
 
+	// 3. Xác thực người dùng
 	var token string
 	if cfg.IsRegister {
 		fmt.Printf("[AUTH] Registering account '%s'...\n", cfg.Username)
@@ -163,6 +166,7 @@ func ConnectCentral(cfg *Config) (*CentralSession, error) {
 
 	authCtx := metadata.AppendToOutgoingContext(context.Background(), "authorization", "Bearer "+token)
 
+	// 4. Phân nhánh kịch bản: Rejoin / Create Room / Join Room / Elo Matchmaking
 	var session *CentralSession
 
 	if cfg.RejoinMatchID != "" {
@@ -250,6 +254,7 @@ func ConnectCentral(cfg *Config) (*CentralSession, error) {
 		}
 	}
 
+	// 5. Mở Stream 2 chiều trận đấu (PlayOnline)
 	playStream, err := client.PlayOnline(authCtx)
 	if err != nil {
 		conn.Close()
