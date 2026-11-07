@@ -1,0 +1,5 @@
+grpcio>=1.85.1
+protobuf>=7.35.1
+
+# Chỉ cần cho việc sinh lại stub Python từ profile.proto.
+grpcio-tools>=1.85.1

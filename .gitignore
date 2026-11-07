@@ -1,2 +1,5 @@
 /bin/
 /TODO
+__pycache__/
+*.pyc
+.venv/

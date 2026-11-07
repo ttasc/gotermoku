@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package handonlab.grpctypes.v1;
+
+option go_package = "github.com/ttasc/gotermoku/doc/handonlab/grpctypes/api;api";
+
+// ProfileService minh họa cách gRPC truyền nhiều kiểu dữ liệu khác nhau:
+// scalar (string/int32/int64/bool/double), bytes, enum, repeated, nested
+// message và map. ListProfiles minh họa thêm server-streaming RPC.
+service ProfileService {
+  rpc SaveProfile(ProfileRequest) returns (ProfileResponse);
+  rpc ListProfiles(ListProfilesRequest) returns (stream Profile);
+}
+
+message ProfileRequest {
+  Profile profile = 1;
+}
+
+message ProfileResponse {
+  bool success = 1;
+  string summary = 2;
+  Profile saved_profile = 3;
+}
+
+message Profile {
+  string name = 1;                    // string
+  int32 age = 2;                      // int32
+  int64 updated_at_unix = 3;          // int64 (Unix timestamp, server tự điền)
+  bool active = 4;                    // bool
+  double score = 5;                   // double
+  repeated string tags = 6;           // repeated -> []string
+  Address address = 7;                // nested message -> *Address
+  Role role = 8;                      // enum -> api.Role
+  bytes avatar = 9;                   // bytes -> []byte
+  map<string, string> attributes = 10; // map -> map[string]string
+}
+
+message Address {
+  string city = 1;
+  string country = 2;
+}
+
+enum Role {
+  ROLE_UNSPECIFIED = 0;
+  ROLE_READER = 1;
+  ROLE_EDITOR = 2;
+}
+
+message ListProfilesRequest {
+  int32 limit = 1; // 0 = không giới hạn
+}
