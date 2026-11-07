@@ -58,7 +58,6 @@ message AuthResponse {
 // ==========================================
 
 message QueueRequest {
-    // Token đã được chuyển sang gRPC Metadata Header ("authorization")
 }
 
 enum QueueStatus {
@@ -117,7 +116,6 @@ message RejoinResponse {
 }
 
 message OnlineAction {
-    // Token đã được chuyển sang gRPC Metadata Header ("authorization")
     string match_id = 1;
     ClientAction action = 2;
 }
